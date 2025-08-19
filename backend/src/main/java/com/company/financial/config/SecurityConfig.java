@@ -1,26 +1,29 @@
 package com.company.financial.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableWebSecurity
 @Slf4j
-public class SecurityConfig extends WebSecurityConfigurerAdapter {
+public class SecurityConfig {
 
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         log.info("Configuring security with permissive access for development");
         
         http
-            .authorizeRequests()
+            .authorizeHttpRequests(authz -> authz
                 .antMatchers("/health/**").permitAll()
                 .anyRequest().permitAll()
-                .and()
-            .csrf().disable()
-            .headers().frameOptions().disable();
+            )
+            .csrf(csrf -> csrf.disable())
+            .headers(headers -> headers.frameOptions().disable());
+        
+        return http.build();
     }
 }
