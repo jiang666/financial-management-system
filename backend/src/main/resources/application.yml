@@ -24,12 +24,6 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MySQL8Dialect
   
-  # MongoDB配置
-  data:
-    mongodb:
-      host: localhost
-      port: 27017
-      database: financial_logs
   
   # Security配置
   security:
