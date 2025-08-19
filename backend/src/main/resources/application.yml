@@ -9,9 +9,9 @@ spring:
   
   # MySQL配置
   datasource:
-    url: jdbc:mysql://localhost:3306/financial_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: root
-    password: root
+    url: jdbc:mysql://127.0.0.1:12100/financial_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: bunny
+    password: bunny
     driver-class-name: com.mysql.cj.jdbc.Driver
   
   # JPA配置
