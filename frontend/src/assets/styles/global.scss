@@ -1,0 +1,162 @@
+@use './variables.scss' as *;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+  font-size: $font-size-base;
+  color: $text-primary;
+  background-color: $bg-page;
+}
+
+#app {
+  height: 100%;
+}
+
+// 滚动条样式
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: $border-extra-light;
+}
+
+::-webkit-scrollbar-thumb {
+  background: $border-light;
+  border-radius: 4px;
+  
+  &:hover {
+    background: $border-base;
+  }
+}
+
+// 页面容器样式
+.page-container {
+  padding: $spacing-lg;
+  background-color: $bg-page;
+  min-height: calc(100vh - #{$header-height});
+}
+
+.page-header {
+  margin-bottom: $spacing-lg;
+  
+  .title {
+    font-size: 24px;
+    font-weight: 500;
+    color: $text-primary;
+    margin-bottom: $spacing-sm;
+  }
+  
+  .description {
+    font-size: $font-size-base;
+    color: $text-secondary;
+  }
+}
+
+// 搜索表单样式
+.search-form {
+  background: $bg-white;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-lg;
+  border-radius: 4px;
+  box-shadow: $box-shadow-light;
+}
+
+// 表格包装样式
+.table-wrapper {
+  background: $bg-white;
+  padding: $spacing-lg;
+  border-radius: 4px;
+  box-shadow: $box-shadow-light;
+  
+  .table-header {
+    margin-bottom: $spacing-md;
+  }
+  
+  .pagination-wrapper {
+    margin-top: $spacing-lg;
+    text-align: right;
+  }
+}
+
+// 文本对齐工具类
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-left { text-align: left; }
+
+// 外边距工具类
+.mt-xs { margin-top: 5px; }
+.mt-sm { margin-top: 10px; }
+.mt-md { margin-top: 15px; }
+.mt-lg { margin-top: 20px; }
+.mt-xl { margin-top: 30px; }
+
+.mb-xs { margin-bottom: 5px; }
+.mb-sm { margin-bottom: 10px; }
+.mb-md { margin-bottom: 15px; }
+.mb-lg { margin-bottom: 20px; }
+.mb-xl { margin-bottom: 30px; }
+
+.ml-xs { margin-left: 5px; }
+.ml-sm { margin-left: 10px; }
+.ml-md { margin-left: 15px; }
+.ml-lg { margin-left: 20px; }
+.ml-xl { margin-left: 30px; }
+
+.mr-xs { margin-right: 5px; }
+.mr-sm { margin-right: 10px; }
+.mr-md { margin-right: 15px; }
+.mr-lg { margin-right: 20px; }
+.mr-xl { margin-right: 30px; }
+
+// 表格优化
+.el-table {
+  .el-table__body-wrapper {
+    overflow-x: auto;
+  }
+}
+
+// 表单优化
+.search-form {
+  .el-form-item {
+    margin-bottom: $spacing-md;
+    
+    .el-input {
+      min-width: 180px;
+    }
+    
+    .el-select {
+      min-width: 120px;
+    }
+  }
+}
+
+// 响应式断点
+@media (max-width: 768px) {
+  .page-container {
+    padding: $spacing-md;
+  }
+  
+  .search-form .el-form-item {
+    display: block;
+    margin-bottom: $spacing-sm;
+    
+    .el-input,
+    .el-select {
+      width: 100% !important;
+      min-width: auto;
+    }
+  }
+  
+  .table-wrapper {
+    overflow-x: auto;
+  }
+}
