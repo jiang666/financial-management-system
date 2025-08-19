@@ -1,5 +1,5 @@
 server:
-  port: 12139
+  port: 9090
   servlet:
     context-path: /api
 
@@ -30,6 +30,15 @@ spring:
     user:
       name: admin
       password: admin123
+
+# JWT配置
+jwt:
+  secret: dGhpc0lzQVZlcnlTZWN1cmVTZWNyZXRLZXlGb3JKV1RIUzUxMkFsZ29yaXRobVRoYXRJc0F0TGVhc3Q2NEJ5dGVzTG9uZ0ZvclNlY3VyaXR5UHVycG9zZXM=
+  expiration: 86400 # 24小时（秒）
+  refresh-expiration: 604800 # 7天（秒）
+  header: Authorization
+  prefix: Bearer
+  issuer: financial-management-system
 
 # 日志配置
 logging:
