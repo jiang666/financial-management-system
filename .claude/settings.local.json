@@ -7,7 +7,8 @@
       "Bash(git push:*)",
       "Bash(git config:*)",
       "Bash(mvn clean:*)",
-      "Bash(mvn:*)"
+      "Bash(mvn:*)",
+      "Bash(timeout 20 mvn spring-boot:run)"
     ],
     "deny": []
   }
