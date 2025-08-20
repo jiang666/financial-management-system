@@ -1,28 +1,40 @@
-package com.company.financial.common;
+package com.company.financial.common.response;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.util.List;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ResponsePageDataEntity<T> {
     
-    private Long total;
-    private List<T> rows;
-    private Integer pageNum;
-    private Integer pageSize;
+    private List<T> content;
+    private long totalElements;
+    private int totalPages;
+    private int size;
+    private int number;
+    private int numberOfElements;
+    private boolean first;
+    private boolean last;
     
-    public ResponsePageDataEntity() {
+    // 兼容旧字段
+    public Long getTotal() {
+        return totalElements;
     }
     
-    public ResponsePageDataEntity(Long total, List<T> rows) {
-        this.total = total;
-        this.rows = rows;
+    public List<T> getRows() {
+        return content;
     }
     
-    public ResponsePageDataEntity(Long total, List<T> rows, Integer pageNum, Integer pageSize) {
-        this.total = total;
-        this.rows = rows;
-        this.pageNum = pageNum;
-        this.pageSize = pageSize;
+    public Integer getPageNum() {
+        return number;
+    }
+    
+    public Integer getPageSize() {
+        return size;
     }
 }

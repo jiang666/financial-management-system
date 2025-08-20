@@ -8,7 +8,14 @@
       "Bash(git config:*)",
       "Bash(mvn clean:*)",
       "Bash(mvn:*)",
-      "Bash(timeout 20 mvn spring-boot:run)"
+      "Bash(timeout 20 mvn spring-boot:run)",
+      "Bash(timeout:*)",
+      "Bash(rm:*)",
+      "Bash(curl:*)",
+      "Bash(taskkill:*)",
+      "Bash(mysql:*)",
+      "Bash(mv:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

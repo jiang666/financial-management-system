@@ -1,6 +1,7 @@
 package com.company.financial.config;
 
 import com.company.financial.security.CustomUserDetailsService;
+import com.company.financial.security.CustomPermissionEvaluator;
 import com.company.financial.security.jwt.JwtAccessDeniedHandler;
 import com.company.financial.security.jwt.JwtAuthenticationEntryPoint;
 import com.company.financial.security.jwt.JwtAuthenticationFilter;
@@ -14,6 +15,8 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -43,6 +46,7 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CustomPermissionEvaluator customPermissionEvaluator;
     
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -154,5 +158,15 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", configuration);
         
         return source;
+    }
+    
+    /**
+     * 方法安全表达式处理器
+     */
+    @Bean
+    public MethodSecurityExpressionHandler methodSecurityExpressionHandler() {
+        DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
+        handler.setPermissionEvaluator(customPermissionEvaluator);
+        return handler;
     }
 }
