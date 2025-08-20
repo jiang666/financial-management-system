@@ -1,6 +1,6 @@
 package com.company.financial.service;
 
-import com.company.financial.common.response.ResponsePageDataEntity;
+import com.company.financial.common.ResponsePageDataEntity;
 import com.company.financial.dto.user.*;
 import org.springframework.data.domain.Page;
 

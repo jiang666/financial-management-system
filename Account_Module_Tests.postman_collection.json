@@ -1,0 +1,188 @@
+{
+  "info": {
+    "name": "Account Module Tests",
+    "description": "科目管理模块测试集合",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. 用户登录",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"登录成功\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.token) {",
+              "    pm.collectionVariables.set(\"access_token\", jsonData.data.token);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/auth/login",
+          "host": ["{{base_url}}"],
+          "path": ["auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "2. 获取科目树",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/accounts/tree",
+          "host": ["{{base_url}}"],
+          "path": ["api", "accounts", "tree"]
+        }
+      }
+    },
+    {
+      "name": "3. 分页查询科目",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/accounts?page=0&size=10",
+          "host": ["{{base_url}}"],
+          "path": ["api", "accounts"],
+          "query": [
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "10"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "4. 搜索科目",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/accounts/search?keyword=现金",
+          "host": ["{{base_url}}"],
+          "path": ["api", "accounts", "search"],
+          "query": [
+            {
+              "key": "keyword",
+              "value": "现金"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "5. 获取资产类科目",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/accounts/tree/ASSET",
+          "host": ["{{base_url}}"],
+          "path": ["api", "accounts", "tree", "ASSET"]
+        }
+      }
+    },
+    {
+      "name": "6. 生成科目编码",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/accounts/next-code",
+          "host": ["{{base_url}}"],
+          "path": ["api", "accounts", "next-code"]
+        }
+      }
+    },
+    {
+      "name": "7. 创建科目",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"9999\",\n  \"name\": \"测试科目\",\n  \"accountType\": \"ASSET\",\n  \"balanceDirection\": \"DEBIT\",\n  \"status\": 1\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/accounts",
+          "host": ["{{base_url}}"],
+          "path": ["api", "accounts"]
+        }
+      }
+    },
+    {
+      "name": "8. 获取期初余额",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/initial-balances/year/2025",
+          "host": ["{{base_url}}"],
+          "path": ["api", "initial-balances", "year", "2025"]
+        }
+      }
+    },
+    {
+      "name": "9. 试算平衡",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/initial-balances/trial-balance/2025",
+          "host": ["{{base_url}}"],
+          "path": ["api", "initial-balances", "trial-balance", "2025"]
+        }
+      }
+    }
+  ]
+}

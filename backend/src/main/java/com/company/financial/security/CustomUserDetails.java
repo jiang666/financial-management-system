@@ -114,4 +114,11 @@ public class CustomUserDetails implements UserDetails {
         }
         return true;
     }
+    
+    /**
+     * 获取用户ID
+     */
+    public String getUserId() {
+        return id;
+    }
 }

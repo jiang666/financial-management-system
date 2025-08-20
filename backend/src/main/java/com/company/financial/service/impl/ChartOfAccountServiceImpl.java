@@ -225,7 +225,7 @@ public class ChartOfAccountServiceImpl implements ChartOfAccountService {
 
     @Override
     public List<AccountDetailDTO> getLeafAccounts() {
-        List<ChartOfAccount> accounts = accountRepository.findByIsLeafTrueOrderByCode(true);
+        List<ChartOfAccount> accounts = accountRepository.findByIsLeafTrueOrderByCode();
         return accounts.stream()
                 .map(this::convertToDetailDTO)
                 .collect(Collectors.toList());

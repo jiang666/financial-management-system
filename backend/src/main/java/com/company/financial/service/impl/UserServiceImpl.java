@@ -1,6 +1,6 @@
 package com.company.financial.service.impl;
 
-import com.company.financial.common.response.ResponsePageDataEntity;
+import com.company.financial.common.ResponsePageDataEntity;
 import com.company.financial.dto.auth.PermissionDTO;
 import com.company.financial.dto.auth.RoleDTO;
 import com.company.financial.dto.user.*;

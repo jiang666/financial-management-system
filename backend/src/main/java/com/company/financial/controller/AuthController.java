@@ -1,6 +1,6 @@
 package com.company.financial.controller;
 
-import com.company.financial.common.response.ResponseEntity;
+import com.company.financial.common.ResponseEntity;
 import com.company.financial.dto.auth.*;
 import com.company.financial.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;

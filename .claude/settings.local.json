@@ -15,7 +15,8 @@
       "Bash(taskkill:*)",
       "Bash(mysql:*)",
       "Bash(mv:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": []
   }

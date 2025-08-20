@@ -1,6 +1,6 @@
 package com.company.financial.controller;
 
-import com.company.financial.common.response.ResponseEntity;
+import com.company.financial.common.ResponseEntity;
 import com.company.financial.dto.auth.PermissionDTO;
 import com.company.financial.dto.auth.RoleDTO;
 import com.company.financial.service.RoleService;

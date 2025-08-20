@@ -1,7 +1,7 @@
 package com.company.financial.controller;
 
-import com.company.financial.common.response.ResponseEntity;
-import com.company.financial.common.response.ResponsePageDataEntity;
+import com.company.financial.common.ResponseEntity;
+import com.company.financial.common.ResponsePageDataEntity;
 import com.company.financial.dto.user.*;
 import com.company.financial.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;

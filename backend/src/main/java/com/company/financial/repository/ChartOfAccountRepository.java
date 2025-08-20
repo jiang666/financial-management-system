@@ -73,7 +73,7 @@ public interface ChartOfAccountRepository extends JpaRepository<ChartOfAccount, 
     /**
      * 查找所有叶子节点科目
      */
-    List<ChartOfAccount> findByIsLeafTrueOrderByCode(Boolean isLeaf);
+    List<ChartOfAccount> findByIsLeafTrueOrderByCode();
 
     /**
      * 检查科目编码是否存在

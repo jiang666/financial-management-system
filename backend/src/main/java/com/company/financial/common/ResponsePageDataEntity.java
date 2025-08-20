@@ -1,4 +1,4 @@
-package com.company.financial.common.response;
+package com.company.financial.common;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -36,5 +36,14 @@ public class ResponsePageDataEntity<T> {
     
     public Integer getPageSize() {
         return size;
+    }
+    
+    // 兼容旧方法
+    public void setTotal(long total) {
+        this.totalElements = total;
+    }
+    
+    public void setRows(List<T> rows) {
+        this.content = rows;
     }
 }

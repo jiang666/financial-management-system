@@ -30,4 +30,12 @@ public class ResponseEntity<T> {
     public static <T> ResponseEntity<T> fail(int code, String message) {
         return new ResponseEntity<>(code, message, null);
     }
+    
+    public static ResponseEntity<Void> success() {
+        return new ResponseEntity<>(200, "操作成功", null);
+    }
+    
+    public static <T> ResponseEntity<T> error(int code, String message) {
+        return new ResponseEntity<>(code, message, null);
+    }
 }

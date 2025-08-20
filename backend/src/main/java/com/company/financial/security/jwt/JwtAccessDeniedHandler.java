@@ -1,7 +1,7 @@
 package com.company.financial.security.jwt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.company.financial.common.response.ResponseEntity;
+import com.company.financial.common.ResponseEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
