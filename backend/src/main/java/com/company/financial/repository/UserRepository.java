@@ -56,9 +56,19 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
     boolean existsByUsername(String username);
     
     /**
+     * 检查用户名是否存在（未删除）
+     */
+    boolean existsByUsernameAndDeletedFalse(String username);
+    
+    /**
      * 检查邮箱是否存在
      */
     boolean existsByEmail(String email);
+    
+    /**
+     * 检查邮箱是否存在（未删除）
+     */
+    boolean existsByEmailAndDeletedFalse(String email);
     
     /**
      * 根据用户名查找用户（包含角色信息）

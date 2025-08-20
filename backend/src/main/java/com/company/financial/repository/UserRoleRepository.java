@@ -36,6 +36,11 @@ public interface UserRoleRepository extends JpaRepository<UserRole, String> {
     boolean existsByUserIdAndRoleId(String userId, String roleId);
     
     /**
+     * 检查角色是否有用户关联
+     */
+    boolean existsByRoleId(String roleId);
+    
+    /**
      * 根据用户ID删除所有角色关联
      */
     @Modifying

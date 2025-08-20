@@ -4,6 +4,7 @@ import com.company.financial.entity.Role;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -16,7 +17,7 @@ import java.util.Set;
  * 角色数据访问接口
  */
 @Repository
-public interface RoleRepository extends JpaRepository<Role, String> {
+public interface RoleRepository extends JpaRepository<Role, String>, JpaSpecificationExecutor<Role> {
     
     /**
      * 根据角色编码查找角色
@@ -42,6 +43,11 @@ public interface RoleRepository extends JpaRepository<Role, String> {
      * 检查角色编码是否存在
      */
     boolean existsByCode(String code);
+    
+    /**
+     * 检查角色编码是否存在（未删除）
+     */
+    boolean existsByCodeAndDeletedFalse(String code);
     
     /**
      * 根据角色编码查找角色（包含权限信息）

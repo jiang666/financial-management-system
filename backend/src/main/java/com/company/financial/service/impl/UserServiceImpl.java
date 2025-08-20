@@ -16,6 +16,8 @@ import com.company.financial.repository.UserRoleRepository;
 import com.company.financial.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,9 +25,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.persistence.criteria.Predicate;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.URLEncoder;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -360,6 +368,216 @@ public class UserServiceImpl implements UserService {
             return SecurityContextHolder.getContext().getAuthentication().getName();
         } catch (Exception e) {
             return "system";
+        }
+    }
+    
+    @Override
+    public void exportUsers(UserQueryDTO queryDTO, HttpServletResponse response) throws IOException {
+        log.info("导出用户列表");
+        
+        // 查询用户数据
+        ResponsePageDataEntity<UserDetailDTO> result = queryUsers(queryDTO);
+        List<UserDetailDTO> users = result.getData();
+        
+        // 创建Excel工作簿
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("用户列表");
+            
+            // 创建表头样式
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            
+            // 创建表头
+            Row headerRow = sheet.createRow(0);
+            String[] headers = {"用户名", "姓名", "邮箱", "手机号", "状态", "角色", "最后登录时间", "创建时间"};
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+            
+            // 填充数据
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            for (int i = 0; i < users.size(); i++) {
+                Row row = sheet.createRow(i + 1);
+                UserDetailDTO user = users.get(i);
+                
+                row.createCell(0).setCellValue(user.getUsername());
+                row.createCell(1).setCellValue(user.getRealName());
+                row.createCell(2).setCellValue(user.getEmail());
+                row.createCell(3).setCellValue(user.getPhone());
+                row.createCell(4).setCellValue(user.getStatus() == 1 ? "启用" : "禁用");
+                
+                // 角色列表
+                String roles = user.getRoles().stream()
+                        .map(RoleDTO::getName)
+                        .collect(Collectors.joining(", "));
+                row.createCell(5).setCellValue(roles);
+                
+                row.createCell(6).setCellValue(user.getLastLoginAt() != null ? 
+                        user.getLastLoginAt().format(formatter) : "");
+                row.createCell(7).setCellValue(user.getCreatedAt().format(formatter));
+            }
+            
+            // 自动调整列宽
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+            
+            // 设置响应头
+            String filename = "用户列表_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setCharacterEncoding("UTF-8");
+            response.setHeader("Content-Disposition", 
+                    "attachment; filename=" + URLEncoder.encode(filename, "UTF-8"));
+            
+            // 输出Excel文件
+            try (OutputStream outputStream = response.getOutputStream()) {
+                workbook.write(outputStream);
+                outputStream.flush();
+            }
+        }
+    }
+    
+    @Override
+    public String importUsers(MultipartFile file) {
+        log.info("批量导入用户: filename={}", file.getOriginalFilename());
+        
+        if (file.isEmpty()) {
+            throw new BusinessException("文件不能为空");
+        }
+        
+        int successCount = 0;
+        int failCount = 0;
+        List<String> errorMessages = new ArrayList<>();
+        
+        try (XSSFWorkbook workbook = new XSSFWorkbook(file.getInputStream())) {
+            Sheet sheet = workbook.getSheetAt(0);
+            
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) { // 跳过表头
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+                
+                try {
+                    UserCreateDTO createDTO = new UserCreateDTO();
+                    createDTO.setUsername(getCellValue(row.getCell(0)));
+                    createDTO.setRealName(getCellValue(row.getCell(1)));
+                    createDTO.setEmail(getCellValue(row.getCell(2)));
+                    createDTO.setPhone(getCellValue(row.getCell(3)));
+                    createDTO.setPassword("123456"); // 默认密码
+                    createDTO.setStatus(1);
+                    
+                    // 验证必填字段
+                    if (StringUtils.isEmpty(createDTO.getUsername()) || 
+                        StringUtils.isEmpty(createDTO.getRealName())) {
+                        errorMessages.add(String.format("第%d行：用户名和姓名不能为空", i + 1));
+                        failCount++;
+                        continue;
+                    }
+                    
+                    // 检查用户名是否已存在
+                    if (userRepository.existsByUsernameAndDeletedFalse(createDTO.getUsername())) {
+                        errorMessages.add(String.format("第%d行：用户名[%s]已存在", i + 1, createDTO.getUsername()));
+                        failCount++;
+                        continue;
+                    }
+                    
+                    createUser(createDTO);
+                    successCount++;
+                    
+                } catch (Exception e) {
+                    errorMessages.add(String.format("第%d行：%s", i + 1, e.getMessage()));
+                    failCount++;
+                }
+            }
+        } catch (IOException e) {
+            throw new BusinessException("文件读取失败：" + e.getMessage());
+        }
+        
+        StringBuilder result = new StringBuilder();
+        result.append(String.format("导入完成：成功%d条，失败%d条", successCount, failCount));
+        if (!errorMessages.isEmpty()) {
+            result.append("\n错误详情：\n");
+            result.append(String.join("\n", errorMessages));
+        }
+        
+        return result.toString();
+    }
+    
+    @Override
+    public void downloadImportTemplate(HttpServletResponse response) throws IOException {
+        log.info("下载用户导入模板");
+        
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("用户导入模板");
+            
+            // 创建表头样式
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(IndexedColors.LIGHT_BLUE.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            
+            // 创建表头
+            Row headerRow = sheet.createRow(0);
+            String[] headers = {"用户名*", "姓名*", "邮箱", "手机号", "备注"};
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+            
+            // 添加示例数据
+            Row exampleRow = sheet.createRow(1);
+            exampleRow.createCell(0).setCellValue("zhangsan");
+            exampleRow.createCell(1).setCellValue("张三");
+            exampleRow.createCell(2).setCellValue("zhangsan@example.com");
+            exampleRow.createCell(3).setCellValue("13800138000");
+            exampleRow.createCell(4).setCellValue("默认密码：123456");
+            
+            // 自动调整列宽
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+            
+            // 设置响应头
+            String filename = "用户导入模板.xlsx";
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setCharacterEncoding("UTF-8");
+            response.setHeader("Content-Disposition", 
+                    "attachment; filename=" + URLEncoder.encode(filename, "UTF-8"));
+            
+            // 输出Excel文件
+            try (OutputStream outputStream = response.getOutputStream()) {
+                workbook.write(outputStream);
+                outputStream.flush();
+            }
+        }
+    }
+    
+    private String getCellValue(Cell cell) {
+        if (cell == null) return "";
+        
+        switch (cell.getCellType()) {
+            case STRING:
+                return cell.getStringCellValue().trim();
+            case NUMERIC:
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    return cell.getDateCellValue().toString();
+                } else {
+                    return String.valueOf((long) cell.getNumericCellValue());
+                }
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            case FORMULA:
+                return cell.getCellFormula();
+            default:
+                return "";
         }
     }
 }

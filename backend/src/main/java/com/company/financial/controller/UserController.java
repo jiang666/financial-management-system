@@ -13,9 +13,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -172,5 +174,62 @@ public class UserController {
         log.info("移除用户角色请求: userId={}, roleIds={}", userId, roleIds);
         userService.removeUserRoles(userId, roleIds);
         return ResponseEntity.success();
+    }
+    
+    /**
+     * 导出用户列表
+     */
+    @GetMapping("/export")
+    @Operation(summary = "导出用户列表", description = "导出用户列表到Excel文件")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    public void exportUsers(
+            @Parameter(description = "用户名") @RequestParam(required = false) String username,
+            @Parameter(description = "邮箱") @RequestParam(required = false) String email,
+            @Parameter(description = "真实姓名") @RequestParam(required = false) String realName,
+            @Parameter(description = "手机号") @RequestParam(required = false) String phone,
+            @Parameter(description = "部门ID") @RequestParam(required = false) String departmentId,
+            @Parameter(description = "用户状态") @RequestParam(required = false) Integer status,
+            @Parameter(description = "角色ID") @RequestParam(required = false) String roleId,
+            HttpServletResponse response) throws IOException {
+        
+        log.info("导出用户列表请求");
+        
+        UserQueryDTO queryDTO = new UserQueryDTO();
+        queryDTO.setUsername(username);
+        queryDTO.setEmail(email);
+        queryDTO.setRealName(realName);
+        queryDTO.setPhone(phone);
+        queryDTO.setDepartmentId(departmentId);
+        queryDTO.setStatus(status);
+        queryDTO.setRoleId(roleId);
+        // 导出不需要分页限制
+        queryDTO.setPage(1);
+        queryDTO.setSize(Integer.MAX_VALUE);
+        
+        userService.exportUsers(queryDTO, response);
+    }
+    
+    /**
+     * 批量导入用户
+     */
+    @PostMapping("/import")
+    @Operation(summary = "批量导入用户", description = "通过Excel文件批量导入用户")
+    @PreAuthorize("hasAuthority('USER_CREATE')")
+    public ResponseEntity<String> importUsers(
+            @Parameter(description = "Excel文件") @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        log.info("批量导入用户请求: filename={}", file.getOriginalFilename());
+        String result = userService.importUsers(file);
+        return ResponseEntity.success(result);
+    }
+    
+    /**
+     * 下载用户导入模板
+     */
+    @GetMapping("/import/template")
+    @Operation(summary = "下载导入模板", description = "下载用户批量导入模板文件")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    public void downloadImportTemplate(HttpServletResponse response) throws IOException {
+        log.info("下载用户导入模板请求");
+        userService.downloadImportTemplate(response);
     }
 }

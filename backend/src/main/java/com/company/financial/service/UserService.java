@@ -3,6 +3,10 @@ package com.company.financial.service;
 import com.company.financial.common.ResponsePageDataEntity;
 import com.company.financial.dto.user.*;
 import org.springframework.data.domain.Page;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 /**
  * 用户管理服务接口
@@ -58,4 +62,19 @@ public interface UserService {
      * 移除用户角色
      */
     void removeUserRoles(String userId, java.util.List<String> roleIds);
+    
+    /**
+     * 导出用户列表
+     */
+    void exportUsers(UserQueryDTO queryDTO, HttpServletResponse response) throws IOException;
+    
+    /**
+     * 批量导入用户
+     */
+    String importUsers(MultipartFile file);
+    
+    /**
+     * 下载用户导入模板
+     */
+    void downloadImportTemplate(HttpServletResponse response) throws IOException;
 }

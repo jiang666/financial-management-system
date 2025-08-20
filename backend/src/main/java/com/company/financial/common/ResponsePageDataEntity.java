@@ -46,4 +46,14 @@ public class ResponsePageDataEntity<T> {
     public void setRows(List<T> rows) {
         this.content = rows;
     }
+    
+    public List<T> getData() {
+        return content;
+    }
+    
+    public ResponsePageDataEntity(List<T> content, long totalElements, int totalPages) {
+        this.content = content;
+        this.totalElements = totalElements;
+        this.totalPages = totalPages;
+    }
 }
