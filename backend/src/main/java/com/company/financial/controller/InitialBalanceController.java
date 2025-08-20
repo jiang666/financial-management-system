@@ -20,7 +20,7 @@ import java.util.List;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/initial-balances")
+@RequestMapping("/initial-balances")
 @RequiredArgsConstructor
 @Validated
 public class InitialBalanceController {
