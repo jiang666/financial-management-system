@@ -4,6 +4,7 @@ import com.company.financial.entity.InitialBalance;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -63,13 +64,13 @@ public interface InitialBalanceRepository extends JpaRepository<InitialBalance, 
     BigDecimal sumBeginningCreditByFiscalYear(@Param("fiscalYear") Integer fiscalYear);
 
     /**
-     * 检查试算平衡
+     * 检查试算平衡 - 使用默认方法实现
      */
-    @Query("SELECT CASE WHEN " +
-           "(SELECT COALESCE(SUM(ib.beginningDebit), 0) FROM InitialBalance ib WHERE ib.fiscalYear = :fiscalYear) = " +
-           "(SELECT COALESCE(SUM(ib.beginningCredit), 0) FROM InitialBalance ib WHERE ib.fiscalYear = :fiscalYear) " +
-           "THEN true ELSE false END")
-    boolean checkTrialBalance(@Param("fiscalYear") Integer fiscalYear);
+    default boolean checkTrialBalance(Integer fiscalYear) {
+        BigDecimal totalDebit = sumBeginningDebitByFiscalYear(fiscalYear);
+        BigDecimal totalCredit = sumBeginningCreditByFiscalYear(fiscalYear);
+        return totalDebit.compareTo(totalCredit) == 0;
+    }
 
     /**
      * 根据科目类型统计期初余额
@@ -87,6 +88,7 @@ public interface InitialBalanceRepository extends JpaRepository<InitialBalance, 
      */
     @Query("UPDATE InitialBalance ib SET ib.isConfirmed = true, ib.confirmedAt = CURRENT_TIMESTAMP, " +
            "ib.confirmedBy = :userId WHERE ib.fiscalYear = :fiscalYear AND ib.isConfirmed = false")
+    @Modifying
     int confirmByFiscalYear(@Param("fiscalYear") Integer fiscalYear, @Param("userId") String userId);
 
     /**

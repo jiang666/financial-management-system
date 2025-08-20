@@ -2,6 +2,7 @@ package com.company.financial.repository;
 
 import com.company.financial.entity.AccountingPeriod;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -51,14 +52,14 @@ public interface AccountingPeriodRepository extends JpaRepository<AccountingPeri
     /**
      * 获取最早的开放期间
      */
-    @Query("SELECT ap FROM AccountingPeriod ap WHERE ap.status = 'OPEN' ORDER BY ap.fiscalYear, ap.period LIMIT 1")
-    Optional<AccountingPeriod> findEarliestOpenPeriod();
+    @Query("SELECT ap FROM AccountingPeriod ap WHERE ap.status = 'OPEN' ORDER BY ap.fiscalYear, ap.period")
+    List<AccountingPeriod> findOpenPeriodsOrderByDate();
 
     /**
      * 获取最新的已结账期间
      */
-    @Query("SELECT ap FROM AccountingPeriod ap WHERE ap.status IN ('CLOSED', 'LOCKED') ORDER BY ap.fiscalYear DESC, ap.period DESC LIMIT 1")
-    Optional<AccountingPeriod> findLatestClosedPeriod();
+    @Query("SELECT ap FROM AccountingPeriod ap WHERE ap.status IN ('CLOSED', 'LOCKED') ORDER BY ap.fiscalYear DESC, ap.period DESC")
+    List<AccountingPeriod> findClosedPeriodsOrderByDate();
 
     /**
      * 检查是否存在未结账的期间（在指定期间之前）
@@ -72,6 +73,7 @@ public interface AccountingPeriodRepository extends JpaRepository<AccountingPeri
      * 更新当前期间标志
      */
     @Query("UPDATE AccountingPeriod ap SET ap.isCurrent = CASE WHEN ap.id = :periodId THEN true ELSE false END")
+    @Modifying
     void updateCurrentPeriod(@Param("periodId") String periodId);
 
     /**
@@ -85,4 +87,20 @@ public interface AccountingPeriodRepository extends JpaRepository<AccountingPeri
     @Query("SELECT CASE WHEN COUNT(ap) > 0 THEN true ELSE false END FROM AccountingPeriod ap " +
            "WHERE ap.id = :periodId AND ap.status = 'OPEN'")
     boolean isPeriodOpen(@Param("periodId") String periodId);
+    
+    /**
+     * 获取最早的开放期间 - 默认方法实现
+     */
+    default Optional<AccountingPeriod> findEarliestOpenPeriod() {
+        List<AccountingPeriod> periods = findOpenPeriodsOrderByDate();
+        return periods.isEmpty() ? Optional.empty() : Optional.of(periods.get(0));
+    }
+    
+    /**
+     * 获取最新的已结账期间 - 默认方法实现
+     */
+    default Optional<AccountingPeriod> findLatestClosedPeriod() {
+        List<AccountingPeriod> periods = findClosedPeriodsOrderByDate();
+        return periods.isEmpty() ? Optional.empty() : Optional.of(periods.get(0));
+    }
 }
