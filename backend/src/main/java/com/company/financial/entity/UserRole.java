@@ -1,57 +1,36 @@
 package com.company.financial.entity;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.GenericGenerator;
 
 import javax.persistence.*;
-import java.time.LocalDateTime;
 
 /**
- * 用户角色关联实体
+ * 用户角色关联实体类
+ * 
+ * @author System
  */
 @Entity
-@Table(name = "user_roles")
+@Table(name = "tb_user_role")
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserRole {
     
     @Id
-    @GeneratedValue(generator = "uuid2")
-    @GenericGenerator(name = "uuid2", strategy = "uuid2")
-    @Column(name = "id", length = 36)
+    @Column(name = "id")
     private String id;
     
-    /**
-     * 用户ID
-     */
-    @Column(name = "user_id", nullable = false, length = 36)
+    @Column(name = "create_time")
+    private Long createTime;
+    
+    @Column(name = "create_by")
+    private String createBy;
+    
+    @Column(name = "user_id")
     private String userId;
     
-    /**
-     * 角色ID
-     */
-    @Column(name = "role_id", nullable = false, length = 36)
+    @Column(name = "role_id")
     private String roleId;
-    
-    /**
-     * 创建时间
-     */
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-    
-    /**
-     * 创建人
-     */
-    @Column(name = "created_by", length = 36)
-    private String createdBy;
-    
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-    }
 }

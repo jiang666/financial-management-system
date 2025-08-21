@@ -1,441 +1,319 @@
 package com.company.financial.service.impl;
 
-import com.company.financial.common.ResponsePageDataEntity;
-import com.company.financial.dto.auth.*;
-import com.company.financial.entity.*;
-import com.company.financial.exception.DataNotFoundException;
-import com.company.financial.exception.BusinessException;
-import com.company.financial.repository.*;
+import com.company.financial.dto.role.*;
+import com.company.financial.entity.Resource;
+import com.company.financial.entity.Role;
+import com.company.financial.entity.RoleResource;
+import com.company.financial.repository.ResourceRepository;
+import com.company.financial.repository.RoleRepository;
+import com.company.financial.repository.RoleResourceRepository;
+import com.company.financial.repository.UserRoleRepository;
 import com.company.financial.service.RoleService;
-import com.company.financial.util.SecurityUtils;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import javax.persistence.criteria.Predicate;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 角色服务实现
+ * 角色服务实现类
+ * 
+ * @author System
  */
-@Slf4j
 @Service
-@RequiredArgsConstructor
+@Slf4j
 public class RoleServiceImpl implements RoleService {
     
-    private final RoleRepository roleRepository;
-    private final PermissionRepository permissionRepository;
-    private final UserRoleRepository userRoleRepository;
-    private final UserRepository userRepository;
-    private final RolePermissionRepository rolePermissionRepository;
+    @Autowired
+    private RoleRepository roleRepository;
+    
+    @Autowired
+    private ResourceRepository resourceRepository;
+    
+    @Autowired
+    private RoleResourceRepository roleResourceRepository;
+    
+    @Autowired
+    private UserRoleRepository userRoleRepository;
     
     @Override
-    public List<RoleDTO> getAllRoles() {
-        List<Role> roles = roleRepository.findByDeletedFalseAndStatus(1);
+    public Page<RoleDetailDTO> findRoles(RoleQueryDTO queryDTO) {
+        Pageable pageable = PageRequest.of(queryDTO.getPage(), queryDTO.getSize());
+        
+        Page<Role> rolePage = roleRepository.findRolesByConditions(
+                queryDTO.getRoleCode(),
+                queryDTO.getName(),
+                queryDTO.getStatus(),
+                0,
+                pageable
+        );
+        
+        List<RoleDetailDTO> roleDetailDTOs = rolePage.getContent().stream()
+                .map(this::convertToDetailDTO)
+                .collect(Collectors.toList());
+        
+        return new PageImpl<>(roleDetailDTOs, pageable, rolePage.getTotalElements());
+    }
+    
+    @Override
+    public List<RoleDetailDTO> findAllRoles() {
+        List<Role> roles = roleRepository.findByStatusAndDeletedOrderByCreateTime("ACTIVE", 0);
         return roles.stream()
-                .map(this::convertToRoleDTO)
+                .map(this::convertToDetailDTO)
                 .collect(Collectors.toList());
     }
     
     @Override
-    public RoleDTO getRoleById(String roleId) {
-        Role role = roleRepository.findByIdAndDeletedFalse(roleId)
-                .orElseThrow(() -> new DataNotFoundException("角色不存在"));
-        return convertToRoleDTO(role);
-    }
-    
-    @Override
-    public RoleDTO getRoleByCode(String roleCode) {
-        Role role = roleRepository.findByCodeAndDeletedFalse(roleCode)
-                .orElseThrow(() -> new DataNotFoundException("角色不存在"));
-        return convertToRoleDTO(role);
-    }
-    
-    @Override
-    public List<PermissionDTO> getAllPermissions() {
-        List<Permission> permissions = permissionRepository.findByDeletedFalse();
-        return permissions.stream()
-                .map(this::convertToPermissionDTO)
-                .collect(Collectors.toList());
-    }
-    
-    @Override
-    @Cacheable(value = "userPermissions", key = "#userId")
-    public List<PermissionDTO> getUserPermissions(String userId) {
-        log.debug("获取用户权限: userId={}", userId);
+    public RoleDetailDTO findRoleById(String id) {
+        Role role = roleRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("角色不存在"));
         
-        // 验证用户存在
-        if (!userRepository.existsByIdAndDeletedFalse(userId)) {
-            throw new DataNotFoundException("用户不存在");
+        if (role.getDeleted() == 1) {
+            throw new RuntimeException("角色已被删除");
         }
         
-        // 获取用户角色
-        List<UserRole> userRoles = userRoleRepository.findByUserId(userId);
-        if (userRoles.isEmpty()) {
-            return Collections.emptyList();
-        }
-        
-        // 获取角色ID列表
-        List<String> roleIds = userRoles.stream()
-                .map(UserRole::getRoleId)
-                .collect(Collectors.toList());
-        
-        // 获取所有权限（去重）
-        Set<Permission> permissions = new HashSet<>();
-        List<Role> roles = roleRepository.findAllById(roleIds);
-        
-        for (Role role : roles) {
-            if (role.getStatus() == 1 && !role.getDeleted()) {
-                permissions.addAll(role.getPermissions());
+        return convertToDetailDTO(role);
+    }
+    
+    @Override
+    @Transactional
+    public RoleDetailDTO createRole(RoleCreateDTO createDTO) {
+        try {
+            log.info("开始创建角色，参数: {}", createDTO);
+            
+            // 检查角色编码是否已存在
+            log.debug("检查角色编码是否存在: {}", createDTO.getRoleCode());
+            if (roleRepository.existsByRoleCodeAndDeleted(createDTO.getRoleCode(), 0)) {
+                throw new RuntimeException("角色编码已存在");
             }
+            
+            // 检查角色名称是否已存在
+            log.debug("检查角色名称是否存在: {}", createDTO.getName());
+            if (roleRepository.existsByNameAndDeleted(createDTO.getName(), 0)) {
+                throw new RuntimeException("角色名称已存在");
+            }
+            
+            // 创建角色
+            log.debug("创建新角色实体");
+            Role role = new Role();
+            role.setId(UUID.randomUUID().toString());
+            role.setRoleCode(createDTO.getRoleCode());
+            role.setName(createDTO.getName());
+            role.setDescription(createDTO.getDescription());
+            // 如果未指定状态，默认设置为ACTIVE
+            String status = StringUtils.hasText(createDTO.getStatus()) ? createDTO.getStatus() : "ACTIVE";
+            role.setStatus(status);
+            log.debug("设置角色状态: {}", status);
+            
+            role.setCanDelete(createDTO.getCanDelete() != null ? createDTO.getCanDelete() : 1);
+            role.setCanModify(createDTO.getCanModify() != null ? createDTO.getCanModify() : 1);
+            role.setUserCount(0);
+            role.setDeleted(0);
+            
+            long currentTime = System.currentTimeMillis();
+            role.setCreateTime(currentTime);
+            role.setUpdateTime(currentTime);
+            role.setCreateBy("system"); // TODO: 从当前登录用户获取
+            role.setUpdateBy("system");
+            
+            log.debug("保存角色到数据库");
+            role = roleRepository.save(role);
+            log.info("角色保存成功，ID: {}", role.getId());
+            
+            // 配置权限
+            if (createDTO.getResourceIds() != null && !createDTO.getResourceIds().isEmpty()) {
+                log.debug("配置角色权限，权限数量: {}", createDTO.getResourceIds().size());
+                configurePermissions(role.getId(), createDTO.getResourceIds());
+            }
+            
+            log.debug("转换角色DTO");
+            RoleDetailDTO result = convertToDetailDTO(role);
+            log.info("角色创建完成，返回结果: {}", result.getName());
+            
+            return result;
+        } catch (Exception e) {
+            log.error("创建角色失败，详细错误信息: ", e);
+            throw new RuntimeException("创建角色失败: " + e.getMessage());
         }
-        
-        return permissions.stream()
-                .filter(permission -> !permission.getDeleted())
-                .map(this::convertToPermissionDTO)
-                .collect(Collectors.toList());
-    }
-    
-    @Override
-    public List<RoleDTO> getUserRoles(String userId) {
-        log.debug("获取用户角色: userId={}", userId);
-        
-        // 验证用户存在
-        if (!userRepository.existsByIdAndDeletedFalse(userId)) {
-            throw new DataNotFoundException("用户不存在");
-        }
-        
-        // 获取用户角色关联
-        List<UserRole> userRoles = userRoleRepository.findByUserId(userId);
-        if (userRoles.isEmpty()) {
-            return Collections.emptyList();
-        }
-        
-        // 获取角色ID列表
-        List<String> roleIds = userRoles.stream()
-                .map(UserRole::getRoleId)
-                .collect(Collectors.toList());
-        
-        // 获取角色信息
-        List<Role> roles = roleRepository.findAllById(roleIds);
-        
-        return roles.stream()
-                .filter(role -> role.getStatus() == 1 && !role.getDeleted())
-                .map(this::convertToRoleDTO)
-                .collect(Collectors.toList());
-    }
-    
-    @Override
-    @Cacheable(value = "userPermissionCheck", key = "#userId + '_' + #permissionCode")
-    public boolean hasPermission(String userId, String permissionCode) {
-        log.debug("检查用户权限: userId={}, permissionCode={}", userId, permissionCode);
-        
-        // 获取用户所有权限
-        List<PermissionDTO> permissions = getUserPermissions(userId);
-        
-        // 检查是否拥有指定权限
-        return permissions.stream()
-                .anyMatch(permission -> permissionCode.equals(permission.getCode()));
-    }
-    
-    @Override
-    @Cacheable(value = "userRoleCheck", key = "#userId + '_' + #roleCode")
-    public boolean hasRole(String userId, String roleCode) {
-        log.debug("检查用户角色: userId={}, roleCode={}", userId, roleCode);
-        
-        // 获取用户所有角色
-        List<RoleDTO> roles = getUserRoles(userId);
-        
-        // 检查是否拥有指定角色
-        return roles.stream()
-                .anyMatch(role -> roleCode.equals(role.getCode()));
-    }
-    
-    @Override
-    public boolean hasAnyPermission(String userId, String... permissionCodes) {
-        if (permissionCodes == null || permissionCodes.length == 0) {
-            return false;
-        }
-        
-        // 获取用户所有权限
-        List<PermissionDTO> permissions = getUserPermissions(userId);
-        Set<String> userPermissionCodes = permissions.stream()
-                .map(PermissionDTO::getCode)
-                .collect(Collectors.toSet());
-        
-        // 检查是否拥有任一权限
-        return Arrays.stream(permissionCodes)
-                .anyMatch(userPermissionCodes::contains);
-    }
-    
-    @Override
-    public boolean hasAllPermissions(String userId, String... permissionCodes) {
-        if (permissionCodes == null || permissionCodes.length == 0) {
-            return true;
-        }
-        
-        // 获取用户所有权限
-        List<PermissionDTO> permissions = getUserPermissions(userId);
-        Set<String> userPermissionCodes = permissions.stream()
-                .map(PermissionDTO::getCode)
-                .collect(Collectors.toSet());
-        
-        // 检查是否拥有所有权限
-        return Arrays.stream(permissionCodes)
-                .allMatch(userPermissionCodes::contains);
-    }
-    
-    private RoleDTO convertToRoleDTO(Role role) {
-        // 获取角色权限
-        List<PermissionDTO> permissionDTOs = role.getPermissions().stream()
-                .filter(permission -> !permission.getDeleted())
-                .map(this::convertToPermissionDTO)
-                .collect(Collectors.toList());
-        
-        return RoleDTO.builder()
-                .id(role.getId())
-                .code(role.getCode())
-                .name(role.getName())
-                .description(role.getDescription())
-                .status(role.getStatus())
-                .createdAt(role.getCreatedAt())
-                .permissions(permissionDTOs)
-                .build();
-    }
-    
-    private PermissionDTO convertToPermissionDTO(Permission permission) {
-        return PermissionDTO.builder()
-                .id(permission.getId())
-                .code(permission.getCode())
-                .name(permission.getName())
-                .resource(permission.getResource())
-                .action(permission.getAction())
-                .description(permission.getDescription())
-                .build();
     }
     
     @Override
     @Transactional
-    public RoleDTO createRole(RoleCreateDTO createDTO) {
-        log.info("创建角色: code={}, name={}", createDTO.getCode(), createDTO.getName());
+    public RoleDetailDTO updateRole(RoleUpdateDTO updateDTO) {
+        Role role = roleRepository.findById(updateDTO.getId())
+                .orElseThrow(() -> new RuntimeException("角色不存在"));
         
-        // 检查角色编码是否已存在
-        if (roleRepository.existsByCodeAndDeletedFalse(createDTO.getCode())) {
-            throw new BusinessException("角色编码已存在");
+        if (role.getDeleted() == 1) {
+            throw new RuntimeException("角色已被删除");
         }
         
-        Role role = new Role();
-        role.setCode(createDTO.getCode());
-        role.setName(createDTO.getName());
-        role.setDescription(createDTO.getDescription());
-        role.setStatus(createDTO.getStatus());
-        role.setCreatedBy(SecurityUtils.getCurrentUserId());
-        role.setCreatedAt(LocalDateTime.now());
+        if (role.getCanModify() == 0) {
+            throw new RuntimeException("该角色不允许修改");
+        }
         
-        Role savedRole = roleRepository.save(role);
-        return convertToRoleDTO(savedRole);
-    }
-    
-    @Override
-    @Transactional
-    @CacheEvict(value = {"userPermissions", "userPermissionCheck", "userRoleCheck"}, allEntries = true)
-    public RoleDTO updateRole(String roleId, RoleUpdateDTO updateDTO) {
-        log.info("更新角色: roleId={}", roleId);
+        // 检查角色名称是否已存在（排除当前角色）
+        Optional<Role> existingRole = roleRepository.findByNameAndDeleted(updateDTO.getName(), 0);
+        if (existingRole.isPresent() && !existingRole.get().getId().equals(updateDTO.getId())) {
+            throw new RuntimeException("角色名称已存在");
+        }
         
-        Role role = roleRepository.findByIdAndDeletedFalse(roleId)
-                .orElseThrow(() -> new DataNotFoundException("角色不存在"));
-        
+        // 更新角色信息
         role.setName(updateDTO.getName());
         role.setDescription(updateDTO.getDescription());
-        if (updateDTO.getStatus() != null) {
-            role.setStatus(updateDTO.getStatus());
-        }
-        role.setUpdatedBy(SecurityUtils.getCurrentUserId());
-        role.setUpdatedAt(LocalDateTime.now());
+        role.setStatus(updateDTO.getStatus());
+        role.setUpdateTime(System.currentTimeMillis());
+        role.setUpdateBy("system"); // TODO: 从当前登录用户获取
         
-        Role savedRole = roleRepository.save(role);
-        return convertToRoleDTO(savedRole);
+        role = roleRepository.save(role);
+        
+        // 更新权限
+        if (updateDTO.getResourceIds() != null) {
+            roleResourceRepository.deleteByRoleId(role.getId());
+            if (!updateDTO.getResourceIds().isEmpty()) {
+                configurePermissions(role.getId(), updateDTO.getResourceIds());
+            }
+        }
+        
+        return convertToDetailDTO(role);
     }
     
     @Override
     @Transactional
-    @CacheEvict(value = {"userPermissions", "userPermissionCheck", "userRoleCheck"}, allEntries = true)
-    public void deleteRole(String roleId) {
-        log.info("删除角色: roleId={}", roleId);
+    public void deleteRole(String id) {
+        Role role = roleRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("角色不存在"));
         
-        Role role = roleRepository.findByIdAndDeletedFalse(roleId)
-                .orElseThrow(() -> new DataNotFoundException("角色不存在"));
-        
-        // 检查是否有用户关联此角色
-        if (userRoleRepository.existsByRoleId(roleId)) {
-            throw new BusinessException("该角色下还有用户，无法删除");
+        if (role.getCanDelete() == 0) {
+            throw new RuntimeException("该角色不允许删除");
         }
         
-        role.setDeleted(true);
-        role.setUpdatedBy(SecurityUtils.getCurrentUserId());
-        role.setUpdatedAt(LocalDateTime.now());
+        // 检查是否有用户使用该角色
+        if (!userRoleRepository.findByRoleId(id).isEmpty()) {
+            throw new RuntimeException("该角色已被用户使用，无法删除");
+        }
+        
+        // 逻辑删除
+        role.setDeleted(1);
+        role.setUpdateTime(System.currentTimeMillis());
+        role.setUpdateBy("system"); // TODO: 从当前登录用户获取
+        
         roleRepository.save(role);
-    }
-    
-    @Override
-    public ResponsePageDataEntity<RoleDTO> queryRoles(RoleQueryDTO queryDTO) {
-        log.debug("分页查询角色: {}", queryDTO);
         
-        // 构建查询条件
-        Specification<Role> spec = (root, query, criteriaBuilder) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            
-            // 基本条件
-            predicates.add(criteriaBuilder.equal(root.get("deleted"), false));
-            
-            // 角色名称模糊查询
-            if (StringUtils.hasText(queryDTO.getName())) {
-                predicates.add(criteriaBuilder.like(root.get("name"), "%" + queryDTO.getName() + "%"));
-            }
-            
-            // 角色编码模糊查询
-            if (StringUtils.hasText(queryDTO.getCode())) {
-                predicates.add(criteriaBuilder.like(root.get("code"), "%" + queryDTO.getCode() + "%"));
-            }
-            
-            // 状态查询
-            if (queryDTO.getStatus() != null) {
-                predicates.add(criteriaBuilder.equal(root.get("status"), queryDTO.getStatus()));
-            }
-            
-            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
-        };
-        
-        // 构建分页和排序
-        Sort sort = Sort.by(
-                "desc".equalsIgnoreCase(queryDTO.getSortDir()) ? Sort.Direction.DESC : Sort.Direction.ASC,
-                queryDTO.getSortBy()
-        );
-        Pageable pageable = PageRequest.of(queryDTO.getPage() - 1, queryDTO.getSize(), sort);
-        
-        // 执行查询
-        Page<Role> rolePage = roleRepository.findAll(spec, pageable);
-        
-        // 转换结果
-        List<RoleDTO> roleDTOs = rolePage.getContent().stream()
-                .map(this::convertToRoleDTO)
-                .collect(Collectors.toList());
-        
-        return new ResponsePageDataEntity<>(
-                roleDTOs,
-                rolePage.getTotalElements(),
-                rolePage.getTotalPages()
-        );
+        // 删除角色资源关联
+        roleResourceRepository.deleteByRoleId(id);
     }
     
     @Override
     @Transactional
-    @CacheEvict(value = {"userPermissions", "userPermissionCheck", "userRoleCheck"}, allEntries = true)
-    public void updateRoleStatus(String roleId, Integer status) {
-        log.info("更新角色状态: roleId={}, status={}", roleId, status);
+    public void deleteRoles(List<String> ids) {
+        for (String id : ids) {
+            deleteRole(id);
+        }
+    }
+    
+    @Override
+    @Transactional
+    public void updateStatus(String id, String status) {
+        Role role = roleRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("角色不存在"));
         
-        Role role = roleRepository.findByIdAndDeletedFalse(roleId)
-                .orElseThrow(() -> new DataNotFoundException("角色不存在"));
+        if (role.getDeleted() == 1) {
+            throw new RuntimeException("角色已被删除");
+        }
         
         role.setStatus(status);
-        role.setUpdatedBy(SecurityUtils.getCurrentUserId());
-        role.setUpdatedAt(LocalDateTime.now());
+        role.setUpdateTime(System.currentTimeMillis());
+        role.setUpdateBy("system"); // TODO: 从当前登录用户获取
+        
         roleRepository.save(role);
     }
     
     @Override
-    public List<PermissionDTO> getRolePermissions(String roleId) {
-        log.debug("获取角色权限: roleId={}", roleId);
+    @Transactional
+    public void configurePermissions(String roleId, List<String> resourceIds) {
+        long currentTime = System.currentTimeMillis();
         
-        Role role = roleRepository.findByIdAndDeletedFalse(roleId)
-                .orElseThrow(() -> new DataNotFoundException("角色不存在"));
-        
-        return role.getPermissions().stream()
-                .filter(permission -> !permission.getDeleted())
-                .map(this::convertToPermissionDTO)
+        for (String resourceId : resourceIds) {
+            if (!roleResourceRepository.existsByRoleIdAndResourceId(roleId, resourceId)) {
+                RoleResource roleResource = new RoleResource();
+                roleResource.setId(UUID.randomUUID().toString());
+                roleResource.setRoleId(roleId);
+                roleResource.setResourceId(resourceId);
+                roleResource.setCreateTime(currentTime);
+                roleResource.setCreateBy("system"); // TODO: 从当前登录用户获取
+                
+                roleResourceRepository.save(roleResource);
+            }
+        }
+    }
+    
+    @Override
+    public List<String> getRolePermissions(String roleId) {
+        List<RoleResource> roleResources = roleResourceRepository.findByRoleId(roleId);
+        return roleResources.stream()
+                .map(RoleResource::getResourceId)
                 .collect(Collectors.toList());
     }
     
-    @Override
-    @Transactional
-    @CacheEvict(value = {"userPermissions", "userPermissionCheck", "userRoleCheck"}, allEntries = true)
-    public void assignRolePermissions(String roleId, List<String> permissionIds) {
-        log.info("分配角色权限: roleId={}, permissionIds={}", roleId, permissionIds);
-        
-        Role role = roleRepository.findByIdAndDeletedFalse(roleId)
-                .orElseThrow(() -> new DataNotFoundException("角色不存在"));
-        
-        // 获取权限实体
-        List<Permission> permissions = permissionRepository.findAllById(permissionIds);
-        if (permissions.size() != permissionIds.size()) {
-            throw new DataNotFoundException("部分权限不存在");
-        }
-        
-        // 添加新权限
-        for (Permission permission : permissions) {
-            if (!rolePermissionRepository.existsByRoleIdAndPermissionId(roleId, permission.getId())) {
-                RolePermission rolePermission = new RolePermission();
-                rolePermission.setRoleId(roleId);
-                rolePermission.setPermissionId(permission.getId());
-                rolePermission.setCreatedBy(SecurityUtils.getCurrentUserId());
-                rolePermission.setCreatedAt(LocalDateTime.now());
-                rolePermissionRepository.save(rolePermission);
-            }
-        }
-    }
-    
-    @Override
-    @Transactional
-    @CacheEvict(value = {"userPermissions", "userPermissionCheck", "userRoleCheck"}, allEntries = true)
-    public void removeRolePermissions(String roleId, List<String> permissionIds) {
-        log.info("移除角色权限: roleId={}, permissionIds={}", roleId, permissionIds);
-        
-        Role role = roleRepository.findByIdAndDeletedFalse(roleId)
-                .orElseThrow(() -> new DataNotFoundException("角色不存在"));
-        
-        // 删除指定权限
-        rolePermissionRepository.deleteByRoleIdAndPermissionIdIn(roleId, permissionIds);
-    }
-    
-    @Override
-    @Transactional
-    @CacheEvict(value = {"userPermissions", "userPermissionCheck", "userRoleCheck"}, allEntries = true)
-    public void saveRolePermissions(String roleId, List<String> permissionIds) {
-        log.info("保存角色权限配置: roleId={}, permissionIds={}", roleId, permissionIds);
-        
-        Role role = roleRepository.findByIdAndDeletedFalse(roleId)
-                .orElseThrow(() -> new DataNotFoundException("角色不存在"));
-        
-        // 删除原有所有权限
-        rolePermissionRepository.deleteByRoleId(roleId);
-        
-        if (permissionIds != null && !permissionIds.isEmpty()) {
-            // 验证权限是否存在
-            List<Permission> permissions = permissionRepository.findAllById(permissionIds);
-            if (permissions.size() != permissionIds.size()) {
-                throw new DataNotFoundException("部分权限不存在");
+    /**
+     * 转换为详情DTO
+     */
+    private RoleDetailDTO convertToDetailDTO(Role role) {
+        try {
+            log.debug("开始转换角色DTO，角色ID: {}", role.getId());
+            RoleDetailDTO dto = new RoleDetailDTO();
+            BeanUtils.copyProperties(role, dto);
+            log.debug("基本属性拷贝完成");
+            
+            // 动态计算实际用户数量
+            try {
+                int actualUserCount = userRoleRepository.findByRoleId(role.getId()).size();
+                dto.setUserCount(actualUserCount);
+                log.debug("用户数量计算完成: {}", actualUserCount);
+            } catch (Exception userCountException) {
+                log.warn("计算用户数量失败，使用默认值0: {}", userCountException.getMessage());
+                dto.setUserCount(0);
             }
             
-            // 添加新权限
-            for (String permissionId : permissionIds) {
-                RolePermission rolePermission = new RolePermission();
-                rolePermission.setRoleId(roleId);
-                rolePermission.setPermissionId(permissionId);
-                rolePermission.setCreatedBy(SecurityUtils.getCurrentUserId());
-                rolePermission.setCreatedAt(LocalDateTime.now());
-                rolePermissionRepository.save(rolePermission);
+            // 查询角色资源
+            try {
+                List<Resource> resources = resourceRepository.findResourcesByRoleId(role.getId());
+                List<RoleDetailDTO.ResourceInfo> resourceInfos = resources.stream()
+                        .map(resource -> {
+                            RoleDetailDTO.ResourceInfo resourceInfo = new RoleDetailDTO.ResourceInfo();
+                            resourceInfo.setId(resource.getId());
+                            resourceInfo.setResourceCode(resource.getResourceCode());
+                            resourceInfo.setResourceName(resource.getResourceName());
+                            resourceInfo.setResourceType(resource.getResourceType());
+                            resourceInfo.setParentId(resource.getParentId());
+                            resourceInfo.setUrl(resource.getUrl());
+                            resourceInfo.setIcon(resource.getIcon());
+                            resourceInfo.setSortOrder(resource.getSortOrder());
+                            resourceInfo.setLevel(resource.getLevel());
+                            resourceInfo.setDescription(resource.getDescription());
+                            return resourceInfo;
+                        })
+                        .collect(Collectors.toList());
+                
+                dto.setResources(resourceInfos);
+            } catch (Exception resourceException) {
+                log.warn("查询角色 {} 的资源信息失败: {}", role.getId(), resourceException.getMessage());
+                dto.setResources(new ArrayList<>());
             }
+            log.debug("角色DTO转换完成");
+            
+            return dto;
+        } catch (Exception e) {
+            log.error("转换角色DTO失败，角色ID: {}, 错误: ", role.getId(), e);
+            throw new RuntimeException("角色信息转换失败: " + e.getMessage());
         }
     }
 }

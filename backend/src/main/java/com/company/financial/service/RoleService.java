@@ -1,111 +1,91 @@
 package com.company.financial.service;
 
-import com.company.financial.common.ResponsePageDataEntity;
-import com.company.financial.dto.auth.PermissionDTO;
-import com.company.financial.dto.auth.RoleDTO;
-import com.company.financial.dto.auth.RoleCreateDTO;
-import com.company.financial.dto.auth.RoleUpdateDTO;
-import com.company.financial.dto.auth.RoleQueryDTO;
+import com.company.financial.dto.role.*;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 
 /**
  * 角色服务接口
+ * 
+ * @author System
  */
 public interface RoleService {
     
     /**
-     * 获取所有角色
+     * 分页查询角色列表
+     * 
+     * @param queryDTO 查询条件
+     * @return 角色分页数据
      */
-    List<RoleDTO> getAllRoles();
+    Page<RoleDetailDTO> findRoles(RoleQueryDTO queryDTO);
     
     /**
-     * 根据ID获取角色详情
+     * 查询所有角色列表
+     * 
+     * @return 角色列表
      */
-    RoleDTO getRoleById(String roleId);
+    List<RoleDetailDTO> findAllRoles();
     
     /**
-     * 根据角色编码获取角色
+     * 根据ID查询角色详情
+     * 
+     * @param id 角色ID
+     * @return 角色详情
      */
-    RoleDTO getRoleByCode(String roleCode);
-    
-    /**
-     * 获取所有权限
-     */
-    List<PermissionDTO> getAllPermissions();
-    
-    /**
-     * 根据用户ID获取用户的所有权限
-     */
-    List<PermissionDTO> getUserPermissions(String userId);
-    
-    /**
-     * 根据用户ID获取用户的所有角色
-     */
-    List<RoleDTO> getUserRoles(String userId);
-    
-    /**
-     * 检查用户是否拥有指定权限
-     */
-    boolean hasPermission(String userId, String permissionCode);
-    
-    /**
-     * 检查用户是否拥有指定角色
-     */
-    boolean hasRole(String userId, String roleCode);
-    
-    /**
-     * 检查用户是否拥有任一指定权限
-     */
-    boolean hasAnyPermission(String userId, String... permissionCodes);
-    
-    /**
-     * 检查用户是否拥有所有指定权限
-     */
-    boolean hasAllPermissions(String userId, String... permissionCodes);
+    RoleDetailDTO findRoleById(String id);
     
     /**
      * 创建角色
+     * 
+     * @param createDTO 创建信息
+     * @return 角色详情
      */
-    RoleDTO createRole(RoleCreateDTO createDTO);
+    RoleDetailDTO createRole(RoleCreateDTO createDTO);
     
     /**
      * 更新角色
+     * 
+     * @param updateDTO 更新信息
+     * @return 角色详情
      */
-    RoleDTO updateRole(String roleId, RoleUpdateDTO updateDTO);
+    RoleDetailDTO updateRole(RoleUpdateDTO updateDTO);
     
     /**
      * 删除角色
+     * 
+     * @param id 角色ID
      */
-    void deleteRole(String roleId);
+    void deleteRole(String id);
     
     /**
-     * 分页查询角色
+     * 批量删除角色
+     * 
+     * @param ids 角色ID列表
      */
-    ResponsePageDataEntity<RoleDTO> queryRoles(RoleQueryDTO queryDTO);
+    void deleteRoles(List<String> ids);
     
     /**
      * 更新角色状态
+     * 
+     * @param id 角色ID
+     * @param status 状态
      */
-    void updateRoleStatus(String roleId, Integer status);
+    void updateStatus(String id, String status);
     
     /**
-     * 获取角色的权限
+     * 为角色配置权限
+     * 
+     * @param roleId 角色ID
+     * @param resourceIds 资源ID列表
      */
-    List<PermissionDTO> getRolePermissions(String roleId);
+    void configurePermissions(String roleId, List<String> resourceIds);
     
     /**
-     * 分配角色权限
+     * 获取角色的权限列表
+     * 
+     * @param roleId 角色ID
+     * @return 资源ID列表
      */
-    void assignRolePermissions(String roleId, List<String> permissionIds);
-    
-    /**
-     * 移除角色权限
-     */
-    void removeRolePermissions(String roleId, List<String> permissionIds);
-    
-    /**
-     * 保存角色权限配置(完全替换)
-     */
-    void saveRolePermissions(String roleId, List<String> permissionIds);
+    List<String> getRolePermissions(String roleId);
 }

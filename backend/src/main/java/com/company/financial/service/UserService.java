@@ -1,80 +1,100 @@
 package com.company.financial.service;
 
-import com.company.financial.common.ResponsePageDataEntity;
 import com.company.financial.dto.user.*;
 import org.springframework.data.domain.Page;
-import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
+import java.util.List;
 
 /**
- * 用户管理服务接口
+ * 用户服务接口
+ * 
+ * @author System
  */
 public interface UserService {
     
     /**
+     * 分页查询用户列表
+     * 
+     * @param queryDTO 查询条件
+     * @return 用户分页数据
+     */
+    Page<UserDetailDTO> findUsers(UserQueryDTO queryDTO);
+    
+    /**
+     * 根据ID查询用户详情
+     * 
+     * @param id 用户ID
+     * @return 用户详情
+     */
+    UserDetailDTO findUserById(String id);
+    
+    /**
      * 创建用户
+     * 
+     * @param createDTO 创建信息
+     * @return 用户详情
      */
     UserDetailDTO createUser(UserCreateDTO createDTO);
     
     /**
-     * 更新用户信息
+     * 更新用户
+     * 
+     * @param updateDTO 更新信息
+     * @return 用户详情
      */
-    UserDetailDTO updateUser(String userId, UserUpdateDTO updateDTO);
+    UserDetailDTO updateUser(UserUpdateDTO updateDTO);
     
     /**
-     * 根据ID获取用户详细信息
+     * 删除用户
+     * 
+     * @param id 用户ID
      */
-    UserDetailDTO getUserById(String userId);
+    void deleteUser(String id);
     
     /**
-     * 根据用户名获取用户详细信息
+     * 批量删除用户
+     * 
+     * @param ids 用户ID列表
      */
-    UserDetailDTO getUserByUsername(String username);
-    
-    /**
-     * 分页查询用户
-     */
-    ResponsePageDataEntity<UserDetailDTO> queryUsers(UserQueryDTO queryDTO);
-    
-    /**
-     * 删除用户（软删除）
-     */
-    void deleteUser(String userId);
-    
-    /**
-     * 启用/禁用用户
-     */
-    void updateUserStatus(String userId, Integer status);
+    void deleteUsers(List<String> ids);
     
     /**
      * 重置用户密码
+     * 
+     * @param id 用户ID
+     * @param newPassword 新密码
      */
-    void resetUserPassword(String userId, String newPassword);
+    void resetPassword(String id, String newPassword);
     
     /**
-     * 分配用户角色
+     * 更新用户状态
+     * 
+     * @param id 用户ID
+     * @param status 状态
      */
-    void assignUserRoles(String userId, java.util.List<String> roleIds);
+    void updateStatus(String id, String status);
+    
+    /**
+     * 为用户分配角色
+     * 
+     * @param userId 用户ID
+     * @param roleIds 角色ID列表
+     */
+    void assignRoles(String userId, List<String> roleIds);
     
     /**
      * 移除用户角色
+     * 
+     * @param userId 用户ID
+     * @param roleIds 角色ID列表
      */
-    void removeUserRoles(String userId, java.util.List<String> roleIds);
+    void removeRoles(String userId, List<String> roleIds);
     
     /**
-     * 导出用户列表
+     * 导出用户数据
+     * 
+     * @param queryDTO 查询条件
+     * @return 用户数据
      */
-    void exportUsers(UserQueryDTO queryDTO, HttpServletResponse response) throws IOException;
-    
-    /**
-     * 批量导入用户
-     */
-    String importUsers(MultipartFile file);
-    
-    /**
-     * 下载用户导入模板
-     */
-    void downloadImportTemplate(HttpServletResponse response) throws IOException;
+    List<UserDetailDTO> exportUsers(UserQueryDTO queryDTO);
 }

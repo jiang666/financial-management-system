@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8085
   servlet:
     context-path: /api
 
@@ -23,6 +23,10 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQL8Dialect
+  
+  # Flyway配置
+  flyway:
+    enabled: false
   
   
   # Security配置

@@ -1,235 +1,261 @@
 package com.company.financial.controller;
 
-import com.company.financial.common.ResponseEntity;
-import com.company.financial.common.ResponsePageDataEntity;
+import com.company.financial.common.response.ResponseData;
+import com.company.financial.common.response.ResponsePageData;
 import com.company.financial.dto.user.*;
 import com.company.financial.service.UserService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.validation.annotation.Validated;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
-import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 用户管理控制器
+ * 
+ * @author System
  */
-@Slf4j
 @RestController
-@RequestMapping("/users")
-@RequiredArgsConstructor
-@Tag(name = "用户管理", description = "用户管理相关接口")
-@Validated
+@RequestMapping("/v1/users")
+@Slf4j
 public class UserController {
     
-    private final UserService userService;
+    @Autowired
+    private UserService userService;
+    
+    /**
+     * 分页查询用户列表
+     * 
+     * @param queryDTO 查询条件
+     * @return 用户分页数据
+     */
+    @GetMapping
+    public ResponseEntity<ResponsePageData<UserDetailDTO>> getUsers(UserQueryDTO queryDTO) {
+        try {
+            Page<UserDetailDTO> page = userService.findUsers(queryDTO);
+            return ResponseEntity.ok(ResponsePageData.success(page));
+        } catch (Exception e) {
+            log.error("查询用户列表失败", e);
+            return ResponseEntity.ok(ResponsePageData.success("查询失败: " + e.getMessage(), Page.empty()));
+        }
+    }
+    
+    /**
+     * 根据ID查询用户详情
+     * 
+     * @param id 用户ID
+     * @return 用户详情
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<ResponseData<UserDetailDTO>> getUserById(@PathVariable String id) {
+        try {
+            UserDetailDTO user = userService.findUserById(id);
+            return ResponseEntity.ok(ResponseData.success(user));
+        } catch (Exception e) {
+            log.error("查询用户详情失败", e);
+            return ResponseEntity.ok(ResponseData.error("查询失败: " + e.getMessage()));
+        }
+    }
     
     /**
      * 创建用户
+     * 
+     * @param createDTO 创建信息
+     * @return 用户详情
      */
     @PostMapping
-    @Operation(summary = "创建用户", description = "创建新用户")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
-    public ResponseEntity<UserDetailDTO> createUser(@Valid @RequestBody UserCreateDTO createDTO) {
-        log.info("创建用户请求: {}", createDTO.getUsername());
-        UserDetailDTO user = userService.createUser(createDTO);
-        return ResponseEntity.success(user);
+    public ResponseEntity<ResponseData<UserDetailDTO>> createUser(@Valid @RequestBody UserCreateDTO createDTO) {
+        try {
+            log.info("接收到用户创建请求: {}", createDTO);
+            UserDetailDTO user = userService.createUser(createDTO);
+            return ResponseEntity.ok(ResponseData.success("用户创建成功", user));
+        } catch (Exception e) {
+            log.error("创建用户失败，详细错误信息: ", e);
+            return ResponseEntity.ok(ResponseData.error("创建失败: " + e.getMessage()));
+        }
+    }
+    
+    @PostMapping("/test")
+    public ResponseEntity<ResponseData<String>> testEndpoint(@RequestBody Map<String, Object> testData) {
+        try {
+            log.info("收到测试请求: {}", testData);
+            
+            // 测试创建一个基本用户
+            if (testData.containsKey("testUserCreation")) {
+                try {
+                    UserCreateDTO createDTO = new UserCreateDTO();
+                    createDTO.setUsername("testuser");
+                    createDTO.setPassword("123456");
+                    createDTO.setRealName("测试用户");
+                    
+                    UserDetailDTO user = userService.createUser(createDTO);
+                    return ResponseEntity.ok(ResponseData.success("用户创建测试成功", user.getUsername()));
+                } catch (Exception e) {
+                    log.error("用户创建测试失败", e);
+                    return ResponseEntity.ok(ResponseData.error("用户创建测试失败: " + e.getMessage()));
+                }
+            }
+            
+            return ResponseEntity.ok(ResponseData.success("测试成功", "数据接收正常"));
+        } catch (Exception e) {
+            log.error("测试失败", e);
+            return ResponseEntity.ok(ResponseData.error("测试失败: " + e.getMessage()));
+        }
     }
     
     /**
-     * 更新用户信息
+     * 更新用户
+     * 
+     * @param id 用户ID
+     * @param updateDTO 更新信息
+     * @return 用户详情
      */
-    @PutMapping("/{userId}")
-    @Operation(summary = "更新用户", description = "更新用户信息")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
-    public ResponseEntity<UserDetailDTO> updateUser(
-            @Parameter(description = "用户ID") @PathVariable @NotBlank String userId,
-            @Valid @RequestBody UserUpdateDTO updateDTO) {
-        log.info("更新用户请求: {}", userId);
-        UserDetailDTO user = userService.updateUser(userId, updateDTO);
-        return ResponseEntity.success(user);
-    }
-    
-    /**
-     * 获取用户详细信息
-     */
-    @GetMapping("/{userId}")
-    @Operation(summary = "获取用户详情", description = "根据ID获取用户详细信息")
-    @PreAuthorize("hasAuthority('USER_READ')")
-    public ResponseEntity<UserDetailDTO> getUserById(
-            @Parameter(description = "用户ID") @PathVariable @NotBlank String userId) {
-        UserDetailDTO user = userService.getUserById(userId);
-        return ResponseEntity.success(user);
-    }
-    
-    /**
-     * 分页查询用户
-     */
-    @GetMapping
-    @Operation(summary = "查询用户列表", description = "分页查询用户列表")
-    @PreAuthorize("hasAuthority('USER_READ')")
-    public ResponseEntity<ResponsePageDataEntity<UserDetailDTO>> queryUsers(
-            @Parameter(description = "用户名") @RequestParam(required = false) String username,
-            @Parameter(description = "邮箱") @RequestParam(required = false) String email,
-            @Parameter(description = "真实姓名") @RequestParam(required = false) String realName,
-            @Parameter(description = "手机号") @RequestParam(required = false) String phone,
-            @Parameter(description = "部门ID") @RequestParam(required = false) String departmentId,
-            @Parameter(description = "用户状态") @RequestParam(required = false) Integer status,
-            @Parameter(description = "角色ID") @RequestParam(required = false) String roleId,
-            @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer page,
-            @Parameter(description = "页大小") @RequestParam(defaultValue = "10") Integer size,
-            @Parameter(description = "排序字段") @RequestParam(defaultValue = "createdAt") String sortBy,
-            @Parameter(description = "排序方向") @RequestParam(defaultValue = "desc") String sortDir) {
-        
-        UserQueryDTO queryDTO = new UserQueryDTO();
-        queryDTO.setUsername(username);
-        queryDTO.setEmail(email);
-        queryDTO.setRealName(realName);
-        queryDTO.setPhone(phone);
-        queryDTO.setDepartmentId(departmentId);
-        queryDTO.setStatus(status);
-        queryDTO.setRoleId(roleId);
-        queryDTO.setPage(page);
-        queryDTO.setSize(size);
-        queryDTO.setSortBy(sortBy);
-        queryDTO.setSortDir(sortDir);
-        
-        ResponsePageDataEntity<UserDetailDTO> result = userService.queryUsers(queryDTO);
-        return ResponseEntity.success(result);
+    @PutMapping("/{id}")
+    public ResponseEntity<ResponseData<UserDetailDTO>> updateUser(@PathVariable String id, 
+                                                                @Valid @RequestBody UserUpdateDTO updateDTO) {
+        try {
+            updateDTO.setId(id);
+            UserDetailDTO user = userService.updateUser(updateDTO);
+            return ResponseEntity.ok(ResponseData.success("用户更新成功", user));
+        } catch (Exception e) {
+            log.error("更新用户失败", e);
+            return ResponseEntity.ok(ResponseData.error("更新失败: " + e.getMessage()));
+        }
     }
     
     /**
      * 删除用户
+     * 
+     * @param id 用户ID
+     * @return 响应结果
      */
-    @DeleteMapping("/{userId}")
-    @Operation(summary = "删除用户", description = "软删除用户")
-    @PreAuthorize("hasAuthority('USER_DELETE')")
-    public ResponseEntity<Void> deleteUser(
-            @Parameter(description = "用户ID") @PathVariable @NotBlank String userId) {
-        log.info("删除用户请求: {}", userId);
-        userService.deleteUser(userId);
-        return ResponseEntity.success();
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ResponseData<Object>> deleteUser(@PathVariable String id) {
+        try {
+            userService.deleteUser(id);
+            return ResponseEntity.ok(ResponseData.success("用户删除成功"));
+        } catch (Exception e) {
+            log.error("删除用户失败", e);
+            return ResponseEntity.ok(ResponseData.error("删除失败: " + e.getMessage()));
+        }
     }
     
     /**
-     * 启用/禁用用户
+     * 批量删除用户
+     * 
+     * @param request 用户ID列表
+     * @return 响应结果
      */
-    @PatchMapping("/{userId}/status")
-    @Operation(summary = "更新用户状态", description = "启用或禁用用户")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
-    public ResponseEntity<Void> updateUserStatus(
-            @Parameter(description = "用户ID") @PathVariable @NotBlank String userId,
-            @Parameter(description = "状态：1-启用 0-禁用") @RequestParam @NotNull Integer status) {
-        log.info("更新用户状态请求: userId={}, status={}", userId, status);
-        userService.updateUserStatus(userId, status);
-        return ResponseEntity.success();
+    @DeleteMapping("/batch")
+    public ResponseEntity<ResponseData<Object>> deleteUsers(@RequestBody Map<String, List<String>> request) {
+        try {
+            List<String> ids = request.get("ids");
+            userService.deleteUsers(ids);
+            return ResponseEntity.ok(ResponseData.success("用户批量删除成功"));
+        } catch (Exception e) {
+            log.error("批量删除用户失败", e);
+            return ResponseEntity.ok(ResponseData.error("删除失败: " + e.getMessage()));
+        }
     }
     
     /**
      * 重置用户密码
+     * 
+     * @param id 用户ID
+     * @param request 密码信息
+     * @return 响应结果
      */
-    @PatchMapping("/{userId}/password")
-    @Operation(summary = "重置用户密码", description = "重置用户密码")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
-    public ResponseEntity<Void> resetUserPassword(
-            @Parameter(description = "用户ID") @PathVariable @NotBlank String userId,
-            @Parameter(description = "新密码") @RequestParam @NotBlank String newPassword) {
-        log.info("重置用户密码请求: {}", userId);
-        userService.resetUserPassword(userId, newPassword);
-        return ResponseEntity.success();
+    @PutMapping("/{id}/password")
+    public ResponseEntity<ResponseData<Object>> resetPassword(@PathVariable String id, 
+                                                           @RequestBody Map<String, String> request) {
+        try {
+            String newPassword = request.get("newPassword");
+            userService.resetPassword(id, newPassword);
+            return ResponseEntity.ok(ResponseData.success("密码重置成功"));
+        } catch (Exception e) {
+            log.error("重置密码失败", e);
+            return ResponseEntity.ok(ResponseData.error("重置失败: " + e.getMessage()));
+        }
     }
     
     /**
-     * 分配用户角色
+     * 更新用户状态
+     * 
+     * @param id 用户ID
+     * @param request 状态信息
+     * @return 响应结果
      */
-    @PostMapping("/{userId}/roles")
-    @Operation(summary = "分配用户角色", description = "为用户分配角色")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
-    public ResponseEntity<Void> assignUserRoles(
-            @Parameter(description = "用户ID") @PathVariable @NotBlank String userId,
-            @Parameter(description = "角色ID列表") @RequestBody @NotNull List<String> roleIds) {
-        log.info("分配用户角色请求: userId={}, roleIds={}", userId, roleIds);
-        userService.assignUserRoles(userId, roleIds);
-        return ResponseEntity.success();
+    @PutMapping("/{id}/status")
+    public ResponseEntity<ResponseData<Object>> updateStatus(@PathVariable String id, 
+                                                          @RequestBody Map<String, String> request) {
+        try {
+            String status = request.get("status");
+            userService.updateStatus(id, status);
+            return ResponseEntity.ok(ResponseData.success("状态更新成功"));
+        } catch (Exception e) {
+            log.error("更新状态失败", e);
+            return ResponseEntity.ok(ResponseData.error("更新失败: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * 为用户分配角色
+     * 
+     * @param id 用户ID
+     * @param request 角色ID列表
+     * @return 响应结果
+     */
+    @PutMapping("/{id}/roles")
+    public ResponseEntity<ResponseData<Object>> assignRoles(@PathVariable String id, 
+                                                         @RequestBody Map<String, List<String>> request) {
+        try {
+            List<String> roleIds = request.get("roleIds");
+            userService.assignRoles(id, roleIds);
+            return ResponseEntity.ok(ResponseData.success("角色分配成功"));
+        } catch (Exception e) {
+            log.error("角色分配失败", e);
+            return ResponseEntity.ok(ResponseData.error("分配失败: " + e.getMessage()));
+        }
     }
     
     /**
      * 移除用户角色
+     * 
+     * @param id 用户ID
+     * @param request 角色ID列表
+     * @return 响应结果
      */
-    @DeleteMapping("/{userId}/roles")
-    @Operation(summary = "移除用户角色", description = "移除用户的角色")
-    @PreAuthorize("hasAuthority('USER_UPDATE')")
-    public ResponseEntity<Void> removeUserRoles(
-            @Parameter(description = "用户ID") @PathVariable @NotBlank String userId,
-            @Parameter(description = "角色ID列表") @RequestBody @NotNull List<String> roleIds) {
-        log.info("移除用户角色请求: userId={}, roleIds={}", userId, roleIds);
-        userService.removeUserRoles(userId, roleIds);
-        return ResponseEntity.success();
+    @DeleteMapping("/{id}/roles")
+    public ResponseEntity<ResponseData<Object>> removeRoles(@PathVariable String id, 
+                                                         @RequestBody Map<String, List<String>> request) {
+        try {
+            List<String> roleIds = request.get("roleIds");
+            userService.removeRoles(id, roleIds);
+            return ResponseEntity.ok(ResponseData.success("角色移除成功"));
+        } catch (Exception e) {
+            log.error("角色移除失败", e);
+            return ResponseEntity.ok(ResponseData.error("移除失败: " + e.getMessage()));
+        }
     }
     
     /**
-     * 导出用户列表
+     * 导出用户数据
+     * 
+     * @param queryDTO 查询条件
+     * @return 用户数据
      */
     @GetMapping("/export")
-    @Operation(summary = "导出用户列表", description = "导出用户列表到Excel文件")
-    @PreAuthorize("hasAuthority('USER_READ')")
-    public void exportUsers(
-            @Parameter(description = "用户名") @RequestParam(required = false) String username,
-            @Parameter(description = "邮箱") @RequestParam(required = false) String email,
-            @Parameter(description = "真实姓名") @RequestParam(required = false) String realName,
-            @Parameter(description = "手机号") @RequestParam(required = false) String phone,
-            @Parameter(description = "部门ID") @RequestParam(required = false) String departmentId,
-            @Parameter(description = "用户状态") @RequestParam(required = false) Integer status,
-            @Parameter(description = "角色ID") @RequestParam(required = false) String roleId,
-            HttpServletResponse response) throws IOException {
-        
-        log.info("导出用户列表请求");
-        
-        UserQueryDTO queryDTO = new UserQueryDTO();
-        queryDTO.setUsername(username);
-        queryDTO.setEmail(email);
-        queryDTO.setRealName(realName);
-        queryDTO.setPhone(phone);
-        queryDTO.setDepartmentId(departmentId);
-        queryDTO.setStatus(status);
-        queryDTO.setRoleId(roleId);
-        // 导出不需要分页限制
-        queryDTO.setPage(1);
-        queryDTO.setSize(Integer.MAX_VALUE);
-        
-        userService.exportUsers(queryDTO, response);
-    }
-    
-    /**
-     * 批量导入用户
-     */
-    @PostMapping("/import")
-    @Operation(summary = "批量导入用户", description = "通过Excel文件批量导入用户")
-    @PreAuthorize("hasAuthority('USER_CREATE')")
-    public ResponseEntity<String> importUsers(
-            @Parameter(description = "Excel文件") @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
-        log.info("批量导入用户请求: filename={}", file.getOriginalFilename());
-        String result = userService.importUsers(file);
-        return ResponseEntity.success(result);
-    }
-    
-    /**
-     * 下载用户导入模板
-     */
-    @GetMapping("/import/template")
-    @Operation(summary = "下载导入模板", description = "下载用户批量导入模板文件")
-    @PreAuthorize("hasAuthority('USER_READ')")
-    public void downloadImportTemplate(HttpServletResponse response) throws IOException {
-        log.info("下载用户导入模板请求");
-        userService.downloadImportTemplate(response);
+    public ResponseEntity<ResponseData<List<UserDetailDTO>>> exportUsers(UserQueryDTO queryDTO) {
+        try {
+            List<UserDetailDTO> users = userService.exportUsers(queryDTO);
+            return ResponseEntity.ok(ResponseData.success("导出成功", users));
+        } catch (Exception e) {
+            log.error("导出用户数据失败", e);
+            return ResponseEntity.ok(ResponseData.error("导出失败: " + e.getMessage()));
+        }
     }
 }

@@ -14,13 +14,13 @@
           <el-input v-model="searchForm.name" placeholder="请输入科目名称" clearable />
         </el-form-item>
         <el-form-item label="科目类型">
-          <el-select v-model="searchForm.type" placeholder="请选择" clearable style="width: 120px">
-            <el-option label="资产" value="资产" />
-            <el-option label="负债" value="负债" />
-            <el-option label="权益" value="权益" />
-            <el-option label="收入" value="收入" />
-            <el-option label="成本" value="成本" />
-            <el-option label="费用" value="费用" />
+          <el-select v-model="searchForm.type" placeholder="请选择" clearable style="width: 140px">
+            <el-option label="资产类" value="资产类" />
+            <el-option label="负债类" value="负债类" />
+            <el-option label="共同类" value="共同类" />
+            <el-option label="所有者权益类" value="所有者权益类" />
+            <el-option label="成本类" value="成本类" />
+            <el-option label="损益类" value="损益类" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -103,12 +103,12 @@
         </el-form-item>
         <el-form-item label="科目类型" prop="type">
           <el-select v-model="accountForm.type" placeholder="请选择科目类型">
-            <el-option label="资产" value="资产" />
-            <el-option label="负债" value="负债" />
-            <el-option label="权益" value="权益" />
-            <el-option label="收入" value="收入" />
-            <el-option label="成本" value="成本" />
-            <el-option label="费用" value="费用" />
+            <el-option label="资产类" value="资产类" />
+            <el-option label="负债类" value="负债类" />
+            <el-option label="共同类" value="共同类" />
+            <el-option label="所有者权益类" value="所有者权益类" />
+            <el-option label="成本类" value="成本类" />
+            <el-option label="损益类" value="损益类" />
           </el-select>
         </el-form-item>
         <el-form-item label="余额方向" prop="direction">
@@ -190,7 +190,7 @@ const accountForm = ref({
   id: '',
   code: '',
   name: '',
-  type: '资产',
+  type: '资产类',
   direction: '借',
   parentId: null,
   auxiliary: [],
@@ -261,12 +261,12 @@ const buildTree = (data) => {
 
 const getTypeTagType = (type) => {
   const typeMap = {
-    '资产': 'success',
-    '负债': 'warning',
-    '权益': '',
-    '收入': 'info',
-    '成本': 'danger',
-    '费用': 'danger'
+    '资产类': 'success',
+    '负债类': 'warning',
+    '共同类': '',
+    '所有者权益类': 'info',
+    '成本类': 'danger',
+    '损益类': 'danger'
   }
   return typeMap[type] || ''
 }
@@ -298,7 +298,7 @@ const handleAdd = () => {
     id: '',
     code: '',
     name: '',
-    type: '资产',
+    type: '资产类',
     direction: '借',
     parentId: null,
     auxiliary: [],

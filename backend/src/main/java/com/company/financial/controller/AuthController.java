@@ -1,89 +1,184 @@
 package com.company.financial.controller;
 
-import com.company.financial.common.ResponseEntity;
+import com.company.financial.common.response.ResponseData;
 import com.company.financial.dto.auth.*;
 import com.company.financial.service.AuthService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.validation.annotation.Validated;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
 /**
  * 认证控制器
+ * 
+ * @author System
  */
-@Slf4j
 @RestController
-@RequestMapping("/auth")
-@RequiredArgsConstructor
-@Tag(name = "认证管理", description = "用户认证相关接口")
-@Validated
+@RequestMapping("/v1/auth")
+@Slf4j
 public class AuthController {
     
-    private final AuthService authService;
+    @Autowired
+    private AuthService authService;
+    
+    @Value("${jwt.header}")
+    private String tokenHeader;
+    
+    @Value("${jwt.prefix}")
+    private String tokenPrefix;
     
     /**
      * 用户登录
+     * 
+     * @param loginRequest 登录请求
+     * @return 登录响应
      */
     @PostMapping("/login")
-    @Operation(summary = "用户登录", description = "使用用户名和密码登录系统")
-    public ResponseEntity<LoginResponseDTO> login(@Valid @RequestBody LoginRequestDTO loginRequest) {
-        log.info("用户登录请求: {}", loginRequest.getUsername());
-        LoginResponseDTO response = authService.login(loginRequest);
-        return ResponseEntity.success(response);
-    }
-    
-    /**
-     * 用户注册
-     */
-    @PostMapping("/register")
-    @Operation(summary = "用户注册", description = "新用户注册")
-    public ResponseEntity<UserInfoDTO> register(@Valid @RequestBody RegisterRequestDTO registerRequest) {
-        log.info("用户注册请求: {}", registerRequest.getUsername());
-        UserInfoDTO userInfo = authService.register(registerRequest);
-        return ResponseEntity.success(userInfo);
-    }
-    
-    /**
-     * 获取当前用户信息
-     */
-    @GetMapping("/me")
-    @Operation(summary = "获取当前用户信息", description = "获取当前登录用户的详细信息")
-    public ResponseEntity<UserInfoDTO> getCurrentUser() {
-        UserInfoDTO userInfo = authService.getCurrentUserInfo();
-        return ResponseEntity.success(userInfo);
-    }
-    
-    /**
-     * 刷新令牌
-     */
-    @PostMapping("/refresh")
-    @Operation(summary = "刷新令牌", description = "使用刷新令牌获取新的访问令牌")
-    public ResponseEntity<LoginResponseDTO> refreshToken(@RequestParam String refreshToken) {
-        LoginResponseDTO response = authService.refreshToken(refreshToken);
-        return ResponseEntity.success(response);
-    }
-    
-    /**
-     * 修改密码
-     */
-    @PostMapping("/change-password")
-    @Operation(summary = "修改密码", description = "修改当前用户的密码")
-    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordDTO changePasswordDTO) {
-        authService.changePassword(changePasswordDTO);
-        return ResponseEntity.success();
+    public ResponseEntity<ResponseData<LoginResponseDTO>> login(@Valid @RequestBody LoginRequestDTO loginRequest) {
+        try {
+            LoginResponseDTO response = authService.login(loginRequest);
+            return ResponseEntity.ok(ResponseData.success("登录成功", response));
+        } catch (Exception e) {
+            log.error("登录失败", e);
+            return ResponseEntity.ok(ResponseData.error("登录失败: " + e.getMessage()));
+        }
     }
     
     /**
      * 用户登出
+     * 
+     * @param request HTTP请求
+     * @return 响应结果
      */
     @PostMapping("/logout")
-    @Operation(summary = "用户登出", description = "退出登录")
-    public ResponseEntity<Void> logout() {
-        authService.logout();
-        return ResponseEntity.success();
+    public ResponseEntity<ResponseData<Object>> logout(HttpServletRequest request) {
+        try {
+            String token = getJwtFromRequest(request);
+            if (StringUtils.hasText(token)) {
+                authService.logout(token);
+            }
+            return ResponseEntity.ok(ResponseData.success("登出成功"));
+        } catch (Exception e) {
+            log.error("登出失败", e);
+            return ResponseEntity.ok(ResponseData.error("登出失败: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * 刷新Token
+     * 
+     * @param request 刷新Token请求
+     * @return 新的Token信息
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<ResponseData<LoginResponseDTO>> refreshToken(@RequestBody RefreshTokenRequest request) {
+        try {
+            LoginResponseDTO response = authService.refreshToken(request.getRefreshToken());
+            return ResponseEntity.ok(ResponseData.success("Token刷新成功", response));
+        } catch (Exception e) {
+            log.error("Token刷新失败", e);
+            return ResponseEntity.ok(ResponseData.error("Token刷新失败: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * 修改密码
+     * 
+     * @param changePasswordDTO 修改密码请求
+     * @return 响应结果
+     */
+    @PutMapping("/password")
+    public ResponseEntity<ResponseData<Object>> changePassword(@Valid @RequestBody ChangePasswordDTO changePasswordDTO) {
+        try {
+            authService.changePassword(changePasswordDTO);
+            return ResponseEntity.ok(ResponseData.success("密码修改成功"));
+        } catch (Exception e) {
+            log.error("修改密码失败", e);
+            return ResponseEntity.ok(ResponseData.error("修改密码失败: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * 获取当前用户信息
+     * 
+     * @return 用户信息
+     */
+    @GetMapping("/me")
+    public ResponseEntity<ResponseData<UserInfoDTO>> getCurrentUser() {
+        try {
+            UserInfoDTO userInfo = authService.getCurrentUserInfo();
+            return ResponseEntity.ok(ResponseData.success(userInfo));
+        } catch (Exception e) {
+            log.error("获取用户信息失败", e);
+            return ResponseEntity.ok(ResponseData.error("获取用户信息失败: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * 获取当前用户权限资源
+     * 
+     * @return 权限资源树
+     */
+    @GetMapping("/resources")
+    public ResponseEntity<ResponseData<ResourceDTO>> getCurrentUserResources() {
+        try {
+            ResourceDTO resources = authService.getCurrentUserResources();
+            return ResponseEntity.ok(ResponseData.success(resources));
+        } catch (Exception e) {
+            log.error("获取用户权限资源失败", e);
+            return ResponseEntity.ok(ResponseData.error("获取权限资源失败: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * 验证Token是否有效
+     * 
+     * @param request HTTP请求
+     * @return 验证结果
+     */
+    @GetMapping("/validate")
+    public ResponseEntity<ResponseData<Object>> validateToken(HttpServletRequest request) {
+        try {
+            String token = getJwtFromRequest(request);
+            if (StringUtils.hasText(token)) {
+                return ResponseEntity.ok(ResponseData.success("Token有效"));
+            } else {
+                return ResponseEntity.ok(ResponseData.error("Token无效"));
+            }
+        } catch (Exception e) {
+            log.error("Token验证失败", e);
+            return ResponseEntity.ok(ResponseData.error("Token验证失败"));
+        }
+    }
+    
+    /**
+     * 从请求中提取JWT Token
+     */
+    private String getJwtFromRequest(HttpServletRequest request) {
+        String bearerToken = request.getHeader(tokenHeader);
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(tokenPrefix + " ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
+    }
+    
+    /**
+     * 刷新Token请求DTO
+     */
+    public static class RefreshTokenRequest {
+        private String refreshToken;
+        
+        public String getRefreshToken() {
+            return refreshToken;
+        }
+        
+        public void setRefreshToken(String refreshToken) {
+            this.refreshToken = refreshToken;
+        }
     }
 }

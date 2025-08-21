@@ -1,10 +1,7 @@
 package com.company.financial.security.jwt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.company.financial.common.ResponseEntity;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -14,33 +11,35 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * JWT认证入口点
  * 处理未认证的请求
+ * 
+ * @author System
  */
-@Slf4j
 @Component
-@RequiredArgsConstructor
+@Slf4j
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
     
-    private final ObjectMapper objectMapper;
-    
     @Override
-    public void commence(HttpServletRequest request,
-                         HttpServletResponse response,
-                         AuthenticationException authException) throws IOException, ServletException {
-        log.error("Responding with unauthorized error. Message - {}", authException.getMessage());
+    public void commence(HttpServletRequest request, HttpServletResponse response,
+                        AuthenticationException authException) throws IOException, ServletException {
+        
+        log.error("Unauthorized error: {}", authException.getMessage());
         
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         
-        ResponseEntity<Object> errorResponse = ResponseEntity.error(
-                HttpStatus.UNAUTHORIZED.value(),
-                "未认证：请先登录"
-        );
+        Map<String, Object> body = new HashMap<>();
+        body.put("code", 401);
+        body.put("message", "Unauthorized: " + authException.getMessage());
+        body.put("timestamp", System.currentTimeMillis());
+        body.put("path", request.getServletPath());
         
-        objectMapper.writeValue(response.getOutputStream(), errorResponse);
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.writeValue(response.getOutputStream(), body);
     }
 }

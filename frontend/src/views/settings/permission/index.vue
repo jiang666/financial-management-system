@@ -36,7 +36,7 @@
         <div class="table-wrapper">
           <div class="table-header">
             <el-button type="primary" icon="Plus" @click="handleAddUser">新增用户</el-button>
-            <el-button icon="Download" @click="exportUsers">导出用户</el-button>
+            <el-button icon="Download" @click="handleExportUsers">导出用户</el-button>
           </div>
           
           <el-table :data="userData" v-loading="userLoading">
@@ -167,13 +167,13 @@
         
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="角色" prop="role">
-              <el-select v-model="userForm.role" style="width: 100%">
+            <el-form-item label="角色" prop="roleId">
+              <el-select v-model="userForm.roleId" style="width: 100%">
                 <el-option
-                  v-for="role in roleList"
-                  :key="role.code"
+                  v-for="role in roleTreeData"
+                  :key="role.id"
                   :label="role.name"
-                  :value="role.code"
+                  :value="role.id"
                 />
               </el-select>
             </el-form-item>
@@ -194,6 +194,17 @@
           <el-col :span="12">
             <el-form-item label="手机号" prop="phone">
               <el-input v-model="userForm.phone" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="状态" prop="status">
+              <el-select v-model="userForm.status" style="width: 100%">
+                <el-option label="启用" value="启用" />
+                <el-option label="停用" value="停用" />
+              </el-select>
             </el-form-item>
           </el-col>
         </el-row>
@@ -232,6 +243,12 @@
         <el-form-item label="角色代码" prop="code">
           <el-input v-model="roleForm.code" :disabled="!!roleForm.id" />
         </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-select v-model="roleForm.status" style="width: 100%">
+            <el-option label="启用" value="启用" />
+            <el-option label="停用" value="停用" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="描述">
           <el-input v-model="roleForm.description" type="textarea" rows="3" />
         </el-form-item>
@@ -246,9 +263,30 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { mockUsers, mockRoles } from '@/api/mockData'
+import { 
+  getUserList, 
+  getUserDetail, 
+  createUser, 
+  updateUser, 
+  deleteUser, 
+  resetUserPassword, 
+  updateUserStatus,
+  assignUserRoles,
+  exportUsers
+} from '@/api/users'
+import { 
+  getRoleList, 
+  getAllRoles, 
+  createRole, 
+  updateRole, 
+  deleteRole, 
+  updateRoleStatus,
+  configRolePermissions,
+  getRolePermissions
+} from '@/api/roles'
+import { getResourceTree } from '@/api/resources'
 
 const activeTab = ref('user')
 const userLoading = ref(false)
@@ -257,6 +295,8 @@ const userDialog = ref(false)
 const roleDialog = ref(false)
 const selectedRole = ref(null)
 const permissionTreeRef = ref()
+const userFormRef = ref()
+const roleFormRef = ref()
 
 const userData = ref([])
 const roleData = ref([])
@@ -273,10 +313,11 @@ const userForm = ref({
   id: '',
   username: '',
   realName: '',
-  role: '',
+  roleId: '',
   department: '',
   email: '',
   phone: '',
+  status: '启用',
   password: '',
   confirmPassword: ''
 })
@@ -285,47 +326,12 @@ const roleForm = ref({
   id: '',
   name: '',
   code: '',
-  description: ''
+  description: '',
+  status: '启用'
 })
 
 const roleTreeData = ref([])
-const permissionTreeData = ref([
-  {
-    id: 1,
-    name: '基础设置',
-    children: [
-      { id: 11, name: '科目管理' },
-      { id: 12, name: '辅助核算' },
-      { id: 13, name: '期初余额' },
-      { id: 14, name: '币种汇率' },
-      { id: 15, name: '系统参数' },
-      { id: 16, name: '组织架构' },
-      { id: 17, name: '用户权限' }
-    ]
-  },
-  {
-    id: 2,
-    name: '日常核算',
-    children: [
-      { id: 21, name: '凭证录入' },
-      { id: 22, name: '凭证审核' },
-      { id: 23, name: '凭证记账' },
-      { id: 24, name: '凭证查询' },
-      { id: 25, name: '账簿查询' },
-      { id: 26, name: '期末结账' }
-    ]
-  },
-  {
-    id: 3,
-    name: '报表管理',
-    children: [
-      { id: 31, name: '资产负债表' },
-      { id: 32, name: '利润表' },
-      { id: 33, name: '现金流量表' },
-      { id: 34, name: '财务指标' }
-    ]
-  }
-])
+const permissionTreeData = ref([])
 
 const userRules = {
   username: [
@@ -334,7 +340,7 @@ const userRules = {
   realName: [
     { required: true, message: '请输入姓名', trigger: 'blur' }
   ],
-  role: [
+  roleId: [
     { required: true, message: '请选择角色', trigger: 'change' }
   ],
   email: [
@@ -344,6 +350,9 @@ const userRules = {
   phone: [
     { required: true, message: '请输入手机号', trigger: 'blur' },
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+  ],
+  status: [
+    { required: true, message: '请选择状态', trigger: 'change' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
@@ -364,14 +373,14 @@ const userRules = {
   ]
 }
 
-const roleRules = {
+const roleRules = computed(() => ({
   name: [
     { required: true, message: '请输入角色名称', trigger: 'blur' }
   ],
-  code: [
+  code: roleForm.value.id ? [] : [
     { required: true, message: '请输入角色代码', trigger: 'blur' }
   ]
-}
+}))
 
 const userDialogTitle = computed(() => {
   return userForm.value.id ? '编辑用户' : '新增用户'
@@ -381,34 +390,133 @@ const roleDialogTitle = computed(() => {
   return roleForm.value.id ? '编辑角色' : '新增角色'
 })
 
-onMounted(() => {
-  loadUserData()
-  loadRoleData()
+onMounted(async () => {
+  // 只加载默认激活标签页的数据
+  if (activeTab.value === 'user') {
+    loadUserData()
+    // 用户管理页面需要角色选项
+    await loadRoleOptions()
+  } else if (activeTab.value === 'role') {
+    loadRoleData()
+  } else if (activeTab.value === 'permission') {
+    loadResourceTree()
+  }
 })
 
-const loadUserData = () => {
-  userLoading.value = true
-  setTimeout(() => {
-    userData.value = mockUsers
-    userLoading.value = false
-  }, 500)
+// 监听标签页切换，每次切换都加载对应数据
+watch(activeTab, async (newTab, oldTab) => {
+  if (newTab === 'user') {
+    loadUserData()
+    // 用户管理页面需要角色选项用于用户编辑
+    if (!roleTreeData.value || roleTreeData.value.length === 0) {
+      await loadRoleOptions()
+    }
+  } else if (newTab === 'role') {
+    loadRoleData()
+  } else if (newTab === 'permission') {
+    loadResourceTree()
+  }
+})
+
+const loadResourceTree = async () => {
+  try {
+    const res = await getResourceTree()
+    if (res.code === 200) {
+      // 过滤出菜单和操作权限，不包括API接口权限
+      permissionTreeData.value = filterResourceTree(res.data)
+    }
+  } catch (error) {
+    ElMessage.error('获取资源树失败')
+  }
 }
 
-const loadRoleData = () => {
+const filterResourceTree = (resources) => {
+  return resources.map(resource => {
+    const node = {
+      id: resource.id,
+      name: resource.resourceName,
+      children: []
+    }
+    
+    if (resource.children && resource.children.length > 0) {
+      // 过滤掉interface类型的资源
+      const filteredChildren = resource.children.filter(child => child.resourceType !== 'interface')
+      if (filteredChildren.length > 0) {
+        node.children = filterResourceTree(filteredChildren)
+      }
+    }
+    
+    return node
+  }).filter(node => node.children.length > 0 || node.id) // 移除没有子节点的空节点
+}
+
+const loadUserData = async () => {
+  userLoading.value = true
+  try {
+    const res = await getUserList({
+      page: 0,
+      size: 10,
+      ...userSearchForm.value
+    })
+    if (res.code === 200) {
+      userData.value = res.data.content.map(user => ({
+        ...user,
+        role: user.roles?.[0]?.name || '',
+        roleCode: user.roles?.[0]?.roleCode || '',
+        status: user.status === 'ACTIVE' ? '启用' : '停用',
+        lastLogin: user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : '从未登录'
+      }))
+    }
+  } catch (error) {
+    ElMessage.error('获取用户列表失败')
+  } finally {
+    userLoading.value = false
+  }
+}
+
+const loadRoleOptions = async () => {
+  try {
+    // 加载所有角色用于下拉选择
+    const allRolesRes = await getAllRoles()
+    if (allRolesRes.code === 200) {
+      roleList.value = allRolesRes.data.map(item => ({
+        name: item.name,
+        code: item.roleCode
+      }))
+      roleTreeData.value = allRolesRes.data.map(item => ({
+        id: item.id,
+        name: item.name,
+        code: item.roleCode
+      }))
+    }
+  } catch (error) {
+    ElMessage.error('获取角色选项失败')
+  }
+}
+
+const loadRoleData = async () => {
   roleLoading.value = true
-  setTimeout(() => {
-    roleData.value = mockRoles
-    roleList.value = mockRoles.map(item => ({
-      name: item.name,
-      code: item.code
-    }))
-    roleTreeData.value = mockRoles.map(item => ({
-      id: item.id,
-      name: item.name,
-      code: item.code
-    }))
+  try {
+    const res = await getRoleList({
+      page: 0,
+      size: 10
+    })
+    if (res.code === 200) {
+      roleData.value = res.data.content.map(role => ({
+        ...role,
+        status: role.status === 'ACTIVE' ? '启用' : '停用'
+      }))
+    }
+    
+    // 如果角色选项还没有加载，也加载一下
+    if (!roleTreeData.value || roleTreeData.value.length === 0) {
+      await loadRoleOptions()
+    }
+  } catch (error) {
+    ElMessage.error('获取角色列表失败')
+  } finally {
     roleLoading.value = false
-  }, 500)
+  }
 }
 
 const getRoleTagType = (role) => {
@@ -424,7 +532,6 @@ const getRoleTagType = (role) => {
 
 const searchUsers = () => {
   loadUserData()
-  ElMessage.success('搜索完成')
 }
 
 const resetUserSearch = () => {
@@ -441,10 +548,11 @@ const handleAddUser = () => {
     id: '',
     username: '',
     realName: '',
-    role: '',
+    roleId: '',
     department: '',
     email: '',
     phone: '',
+    status: '启用',
     password: '',
     confirmPassword: ''
   }
@@ -452,7 +560,13 @@ const handleAddUser = () => {
 }
 
 const handleEditUser = (row) => {
-  userForm.value = { ...row, password: '', confirmPassword: '' }
+  userForm.value = { 
+    ...row, 
+    roleId: row.roles?.[0]?.id || '',
+    status: row.status || '启用',
+    password: '', 
+    confirmPassword: '' 
+  }
   userDialog.value = true
 }
 
@@ -467,15 +581,28 @@ const handleDeleteUser = async (row) => {
         type: 'warning'
       }
     )
-    ElMessage.success('删除成功')
-    loadUserData()
+    const res = await deleteUser(row.id)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      loadUserData()
+    }
   } catch {
     // 取消删除
   }
 }
 
-const handleUserStatusChange = (row) => {
-  ElMessage.success(`用户"${row.realName}"状态已更新`)
+const handleUserStatusChange = async (row) => {
+  try {
+    const status = row.status === '启用' ? 'ACTIVE' : 'INACTIVE'
+    const res = await updateUserStatus(row.id, status)
+    if (res.code === 200) {
+      ElMessage.success(`用户"${row.realName}"状态已更新`)
+    }
+  } catch (error) {
+    ElMessage.error('状态更新失败')
+    // 恢复原状态
+    row.status = row.status === '启用' ? '停用' : '启用'
+  }
 }
 
 const resetPassword = async (row) => {
@@ -489,7 +616,10 @@ const resetPassword = async (row) => {
         type: 'warning'
       }
     )
-    ElMessage.success('密码重置成功，新密码为：123456')
+    const res = await resetUserPassword(row.id, '123456')
+    if (res.code === 200) {
+      ElMessage.success('密码重置成功，新密码为：123456')
+    }
   } catch {
     // 取消重置
   }
@@ -499,17 +629,63 @@ const saveUser = async () => {
   const valid = await userFormRef.value.validate().catch(() => false)
   if (!valid) return
   
-  userDialog.value = false
-  ElMessage.success(userForm.value.id ? '编辑成功' : '新增成功')
-  loadUserData()
+  try {
+    const data = {
+      username: userForm.value.username,
+      realName: userForm.value.realName,
+      email: userForm.value.email,
+      phone: userForm.value.phone,
+      department: userForm.value.department,
+      position: userForm.value.department // 使用部门作为职位
+    }
+    
+    let res
+    if (userForm.value.id) {
+      // 编辑用户时需要添加必填的 status 字段和角色ID
+      data.status = userForm.value.status === '启用' ? 'ACTIVE' : 'INACTIVE'
+      // 如果选择了角色，包含角色ID数组
+      if (userForm.value.roleId) {
+        data.roleIds = [userForm.value.roleId]
+      }
+      res = await updateUser(userForm.value.id, data)
+    } else {
+      data.password = userForm.value.password
+      res = await createUser(data)
+    }
+    
+    if (res.code === 200) {
+      // 如果创建成功并且选择了角色，分配角色
+      if (!userForm.value.id && userForm.value.roleId && res.data.id) {
+        await assignUserRoles(res.data.id, [userForm.value.roleId])
+      }
+      
+      userDialog.value = false
+      ElMessage.success(userForm.value.id ? '编辑成功' : '新增成功')
+      loadUserData()
+    }
+  } catch (error) {
+    ElMessage.error('保存失败')
+  }
 }
 
 const resetUserForm = () => {
   userFormRef.value?.resetFields()
 }
 
-const exportUsers = () => {
-  ElMessage.success('用户导出功能开发中')
+const handleExportUsers = async () => {
+  try {
+    const res = await exportUsers(userSearchForm.value)
+    // 下载文件
+    const blob = new Blob([res.data], { type: 'application/vnd.ms-excel' })
+    const link = document.createElement('a')
+    link.href = window.URL.createObjectURL(blob)
+    link.download = `用户列表_${new Date().toLocaleDateString()}.xlsx`
+    link.click()
+    window.URL.revokeObjectURL(link.href)
+    ElMessage.success('导出成功')
+  } catch (error) {
+    ElMessage.error('导出失败')
+  }
 }
 
 const handleAddRole = () => {
@@ -517,13 +693,17 @@ const handleAddRole = () => {
     id: '',
     name: '',
     code: '',
-    description: ''
+    description: '',
+    status: '启用'
   }
   roleDialog.value = true
 }
 
 const handleEditRole = (row) => {
-  roleForm.value = { ...row }
+  roleForm.value = { 
+    ...row,
+    status: row.status || '启用'
+  }
   roleDialog.value = true
 }
 
@@ -538,24 +718,58 @@ const handleDeleteRole = async (row) => {
         type: 'warning'
       }
     )
-    ElMessage.success('删除成功')
-    loadRoleData()
+    const res = await deleteRole(row.id)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      loadRoleData()
+    }
   } catch {
     // 取消删除
   }
 }
 
-const handleRoleStatusChange = (row) => {
-  ElMessage.success(`角色"${row.name}"状态已更新`)
+const handleRoleStatusChange = async (row) => {
+  try {
+    const status = row.status === '启用' ? 'ACTIVE' : 'INACTIVE'
+    const res = await updateRoleStatus(row.id, status)
+    if (res.code === 200) {
+      ElMessage.success(`角色"${row.name}"状态已更新`)
+    }
+  } catch (error) {
+    ElMessage.error('状态更新失败')
+    // 恢复原状态
+    row.status = row.status === '启用' ? '停用' : '启用'
+  }
 }
 
 const saveRole = async () => {
   const valid = await roleFormRef.value.validate().catch(() => false)
   if (!valid) return
   
-  roleDialog.value = false
-  ElMessage.success(roleForm.value.id ? '编辑成功' : '新增成功')
-  loadRoleData()
+  try {
+    const data = {
+      name: roleForm.value.name,
+      roleCode: roleForm.value.code,
+      description: roleForm.value.description
+    }
+    
+    let res
+    if (roleForm.value.id) {
+      // 编辑时需要添加状态字段
+      data.status = roleForm.value.status === '启用' ? 'ACTIVE' : 'INACTIVE'
+      res = await updateRole(roleForm.value.id, data)
+    } else {
+      res = await createRole(data)
+    }
+    
+    if (res.code === 200) {
+      roleDialog.value = false
+      ElMessage.success(roleForm.value.id ? '编辑成功' : '新增成功')
+      loadRoleData()
+    }
+  } catch (error) {
+    ElMessage.error('保存失败')
+  }
 }
 
 const resetRoleForm = () => {
@@ -573,14 +787,14 @@ const selectRole = (data) => {
   loadRolePermissions(data.id)
 }
 
-const loadRolePermissions = (roleId) => {
-  // 模拟加载角色权限
-  if (roleId === 1) { // 超级管理员
-    checkedPermissions.value = [11, 12, 13, 14, 15, 16, 17, 21, 22, 23, 24, 25, 26, 31, 32, 33, 34]
-  } else if (roleId === 2) { // 财务主管
-    checkedPermissions.value = [11, 12, 13, 14, 21, 22, 23, 24, 25, 26, 31, 32, 33, 34]
-  } else {
-    checkedPermissions.value = [21, 24, 25]
+const loadRolePermissions = async (roleId) => {
+  try {
+    const res = await getRolePermissions(roleId)
+    if (res.code === 200) {
+      checkedPermissions.value = res.data.map(resource => resource.id)
+    }
+  } catch (error) {
+    ElMessage.error('获取角色权限失败')
   }
 }
 
@@ -588,9 +802,16 @@ const handlePermissionCheck = () => {
   // 权限选择变化处理
 }
 
-const savePermissions = () => {
-  const checkedKeys = permissionTreeRef.value.getCheckedKeys()
-  ElMessage.success(`权限保存成功，共选择了${checkedKeys.length}个权限`)
+const savePermissions = async () => {
+  try {
+    const checkedKeys = permissionTreeRef.value.getCheckedKeys()
+    const res = await configRolePermissions(selectedRole.value.id, checkedKeys)
+    if (res.code === 200) {
+      ElMessage.success(`权限保存成功，共选择了${checkedKeys.length}个权限`)
+    }
+  } catch (error) {
+    ElMessage.error('权限保存失败')
+  }
 }
 </script>
 

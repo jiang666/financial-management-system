@@ -4,94 +4,93 @@ import com.company.financial.entity.Role;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * 角色数据访问接口
+ * 
+ * @author System
  */
 @Repository
-public interface RoleRepository extends JpaRepository<Role, String>, JpaSpecificationExecutor<Role> {
+public interface RoleRepository extends JpaRepository<Role, String> {
     
     /**
-     * 根据角色编码查找角色
+     * 根据角色编码查询角色
+     * 
+     * @param roleCode 角色编码
+     * @param deleted 删除标记
+     * @return 角色信息
      */
-    Optional<Role> findByCode(String code);
+    Optional<Role> findByRoleCodeAndDeleted(String roleCode, Integer deleted);
     
     /**
-     * 根据编码查找未删除的角色
+     * 根据角色名称查询角色
+     * 
+     * @param name 角色名称
+     * @param deleted 删除标记
+     * @return 角色信息
      */
-    Optional<Role> findByCodeAndDeletedFalse(String code);
+    Optional<Role> findByNameAndDeleted(String name, Integer deleted);
     
     /**
-     * 根据ID查找未删除的角色
-     */
-    Optional<Role> findByIdAndDeletedFalse(String id);
-    
-    /**
-     * 根据状态查找未删除的角色
-     */
-    List<Role> findByDeletedFalseAndStatus(Integer status);
-    
-    /**
-     * 检查角色编码是否存在
-     */
-    boolean existsByCode(String code);
-    
-    /**
-     * 检查角色编码是否存在（未删除）
-     */
-    boolean existsByCodeAndDeletedFalse(String code);
-    
-    /**
-     * 根据角色编码查找角色（包含权限信息）
-     */
-    @Query("SELECT r FROM Role r LEFT JOIN FETCH r.permissions WHERE r.code = :code")
-    Optional<Role> findByCodeWithPermissions(@Param("code") String code);
-    
-    /**
-     * 根据ID查找角色（包含权限信息）
-     */
-    @Query("SELECT r FROM Role r LEFT JOIN FETCH r.permissions WHERE r.id = :id")
-    Optional<Role> findByIdWithPermissions(@Param("id") String id);
-    
-    /**
-     * 查找所有启用的角色
-     */
-    List<Role> findByStatus(Integer status);
-    
-    /**
-     * 根据角色编码批量查找
-     */
-    List<Role> findByCodeIn(Set<String> codes);
-    
-    /**
-     * 分页查询角色
+     * 分页查询角色列表
+     * 
+     * @param roleCode 角色编码
+     * @param name 角色名称
+     * @param status 状态
+     * @param deleted 删除标记
+     * @param pageable 分页参数
+     * @return 角色分页数据
      */
     @Query("SELECT r FROM Role r WHERE " +
-           "(:code IS NULL OR r.code LIKE %:code%) AND " +
+           "(:roleCode IS NULL OR r.roleCode LIKE %:roleCode%) AND " +
            "(:name IS NULL OR r.name LIKE %:name%) AND " +
-           "(:status IS NULL OR r.status = :status)")
-    Page<Role> findByConditions(@Param("code") String code,
-                                @Param("name") String name,
-                                @Param("status") Integer status,
-                                Pageable pageable);
+           "(:status IS NULL OR r.status = :status) AND " +
+           "r.deleted = :deleted")
+    Page<Role> findRolesByConditions(@Param("roleCode") String roleCode,
+                                   @Param("name") String name,
+                                   @Param("status") String status,
+                                   @Param("deleted") Integer deleted,
+                                   Pageable pageable);
     
     /**
-     * 根据用户ID查找角色
+     * 查询所有启用的角色
+     * 
+     * @param status 状态
+     * @param deleted 删除标记
+     * @return 角色列表
      */
-    @Query("SELECT r FROM Role r JOIN r.users u WHERE u.id = :userId")
-    List<Role> findByUserId(@Param("userId") String userId);
+    List<Role> findByStatusAndDeletedOrderByCreateTime(String status, Integer deleted);
     
     /**
-     * 查找拥有指定权限的角色
+     * 检查角色编码是否已存在
+     * 
+     * @param roleCode 角色编码
+     * @param deleted 删除标记
+     * @return 是否存在
      */
-    @Query("SELECT r FROM Role r JOIN r.permissions p WHERE p.code = :permissionCode")
-    List<Role> findByPermissionCode(@Param("permissionCode") String permissionCode);
+    boolean existsByRoleCodeAndDeleted(String roleCode, Integer deleted);
+    
+    /**
+     * 检查角色名称是否已存在
+     * 
+     * @param name 角色名称
+     * @param deleted 删除标记
+     * @return 是否存在
+     */
+    boolean existsByNameAndDeleted(String name, Integer deleted);
+    
+    /**
+     * 根据用户ID查询用户的角色列表
+     * 
+     * @param userId 用户ID
+     * @return 角色列表
+     */
+    @Query("SELECT r FROM Role r, UserRole ur WHERE r.id = ur.roleId AND ur.userId = :userId AND r.deleted = 0")
+    List<Role> findRolesByUserId(@Param("userId") String userId);
 }

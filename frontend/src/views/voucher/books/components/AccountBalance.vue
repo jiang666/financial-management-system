@@ -3,23 +3,17 @@
     <!-- 查询条件 -->
     <el-card class="query-card" shadow="never">
       <el-form :model="queryForm" inline>
-        <el-form-item label="会计期间">
+        <el-form-item label="查询日期">
           <el-date-picker
-            v-model="queryForm.period"
-            type="month"
-            placeholder="选择月份"
-            format="YYYY-MM"
-            value-format="YYYY-MM"
-            style="width: 200px"
+            v-model="queryForm.dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            style="width: 240px"
           />
-        </el-form-item>
-        <el-form-item label="科目级次">
-          <el-select v-model="queryForm.level" placeholder="请选择" style="width: 120px">
-            <el-option label="1级" value="1" />
-            <el-option label="2级" value="2" />
-            <el-option label="3级" value="3" />
-            <el-option label="4级" value="4" />
-          </el-select>
         </el-form-item>
         <el-form-item label="科目编码">
           <el-input
@@ -210,8 +204,7 @@ const loading = ref(false)
 
 // 查询表单
 const queryForm = reactive({
-  period: '2025-08',
-  level: '',
+  dateRange: ['2025-08-01', '2025-08-31'],
   accountCode: '',
   showZeroBalance: false
 })
@@ -402,8 +395,7 @@ const handleQuery = () => {
 
 // 重置
 const handleReset = () => {
-  queryForm.period = '2025-08'
-  queryForm.level = ''
+  queryForm.dateRange = ['2025-08-01', '2025-08-31']
   queryForm.accountCode = ''
   queryForm.showZeroBalance = false
 }

@@ -1,64 +1,54 @@
 package com.company.financial.dto.user;
 
-import com.company.financial.dto.auth.RoleDTO;
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import lombok.Builder;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 用户详细信息DTO
+ * 用户详情DTO
+ * 
+ * @author System
  */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@Schema(description = "用户详细信息")
 public class UserDetailDTO {
     
-    @Schema(description = "用户ID")
     private String id;
     
-    @Schema(description = "用户名")
     private String username;
     
-    @Schema(description = "邮箱")
-    private String email;
-    
-    @Schema(description = "真实姓名")
     private String realName;
     
-    @Schema(description = "手机号")
+    private String email;
+    
     private String phone;
     
-    @Schema(description = "部门ID")
+    private String department;
+    
     private String departmentId;
     
-    @Schema(description = "用户状态：1-启用 0-禁用")
-    private Integer status;
+    private String position;
     
-    @Schema(description = "最后登录时间")
-    private LocalDateTime lastLoginAt;
+    private String status;
     
-    @Schema(description = "创建时间")
-    private LocalDateTime createdAt;
+    private Long lastLoginAt;
     
-    @Schema(description = "更新时间")
-    private LocalDateTime updatedAt;
+    private String lastLoginIp;
     
-    @Schema(description = "创建人")
-    private String createdBy;
+    private Long createTime;
     
-    @Schema(description = "更新人")
-    private String updatedBy;
+    private Long updateTime;
     
-    @Schema(description = "版本号")
-    private Integer version;
+    private String createBy;
     
-    @Schema(description = "用户角色列表")
-    private List<RoleDTO> roles;
+    private String updateBy;
+    
+    private List<RoleInfo> roles;
+    
+    @Data
+    public static class RoleInfo {
+        private String id;
+        private String roleCode;
+        private String name;
+        private String description;
+    }
 }

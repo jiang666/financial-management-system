@@ -9,10 +9,11 @@
     <el-card class="control-panel">
       <el-form :model="reportForm" inline>
         <el-form-item label="报表类型">
-          <el-select v-model="reportForm.reportType" placeholder="请选择报表类型" @change="handleReportTypeChange" style="width: 160px">
+          <el-select v-model="reportForm.reportType" placeholder="请选择报表类型" @change="handleReportTypeChange" style="width: 200px">
             <el-option label="资产负债表" value="balance_sheet" />
             <el-option label="利润表" value="income_statement" />
             <el-option label="现金流量表" value="cash_flow" />
+            <el-option label="所有者权益（股东权益）变动表" value="equity_statement" />
           </el-select>
         </el-form-item>
         <el-form-item label="报告期间">
@@ -180,6 +181,38 @@
           </el-table>
         </div>
       </div>
+      
+      <!-- 所有者权益（股东权益）变动表 -->
+      <div v-if="reportForm.reportType === 'equity_statement'" class="equity-statement">
+        <el-table :data="reportData.equityItems" border style="width: 100%" show-summary :summary-method="getEquitySummary">
+          <el-table-column prop="itemName" label="项目" width="200" fixed="left" />
+          <el-table-column prop="paidInCapital" label="实收资本" width="120" align="right">
+            <template #default="{ row }">
+              <span v-if="row.paidInCapital !== 0">{{ formatMoney(row.paidInCapital) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="capitalReserve" label="资本公积" width="120" align="right">
+            <template #default="{ row }">
+              <span v-if="row.capitalReserve !== 0">{{ formatMoney(row.capitalReserve) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="surplusReserve" label="盈余公积" width="120" align="right">
+            <template #default="{ row }">
+              <span v-if="row.surplusReserve !== 0">{{ formatMoney(row.surplusReserve) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="retainedEarnings" label="未分配利润" width="120" align="right">
+            <template #default="{ row }">
+              <span v-if="row.retainedEarnings !== 0">{{ formatMoney(row.retainedEarnings) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="totalEquity" label="所有者权益合计" width="140" align="right">
+            <template #default="{ row }">
+              <span class="total-equity">{{ formatMoney(row.totalEquity) }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </el-card>
     
     <!-- 对比分析对话框 -->
@@ -269,6 +302,19 @@ const mockReportData = {
       { itemName: '分配股利支付的现金', currentPeriod: -200000, previousPeriod: -150000 },
       { itemName: '筹资活动产生的现金流量净额', currentPeriod: 0, previousPeriod: 650000 }
     ]
+  },
+  equity_statement: {
+    generateTime: new Date().toLocaleString(),
+    equityItems: [
+      { itemName: '一、期初余额', paidInCapital: 3000000, capitalReserve: 500000, surplusReserve: 300000, retainedEarnings: 1990000, totalEquity: 5790000 },
+      { itemName: '二、本期增减变动金额（减少以"-"号填列）', paidInCapital: 0, capitalReserve: 0, surplusReserve: 68000, retainedEarnings: 612000, totalEquity: 680000 },
+      { itemName: '（一）综合收益总额', paidInCapital: 0, capitalReserve: 0, surplusReserve: 0, retainedEarnings: 680000, totalEquity: 680000 },
+      { itemName: '（二）所有者投入和减少资本', paidInCapital: 0, capitalReserve: 0, surplusReserve: 0, retainedEarnings: 0, totalEquity: 0 },
+      { itemName: '（三）利润分配', paidInCapital: 0, capitalReserve: 0, surplusReserve: 68000, retainedEarnings: -68000, totalEquity: 0 },
+      { itemName: '1.提取盈余公积', paidInCapital: 0, capitalReserve: 0, surplusReserve: 68000, retainedEarnings: -68000, totalEquity: 0 },
+      { itemName: '2.对所有者（或股东）的分配', paidInCapital: 0, capitalReserve: 0, surplusReserve: 0, retainedEarnings: 0, totalEquity: 0 },
+      { itemName: '三、期末余额', paidInCapital: 3000000, capitalReserve: 500000, surplusReserve: 368000, retainedEarnings: 2602000, totalEquity: 6470000 }
+    ]
   }
 }
 
@@ -284,7 +330,8 @@ const getReportTitle = () => {
   const titles = {
     'balance_sheet': '资产负债表',
     'income_statement': '利润表',
-    'cash_flow': '现金流量表'
+    'cash_flow': '现金流量表',
+    'equity_statement': '所有者权益（股东权益）变动表'
   }
   return titles[reportForm.value.reportType] || '财务报表'
 }
@@ -347,6 +394,10 @@ const getLiabilitiesSummary = (param) => {
 
 const getIncomeSummary = (param) => {
   return ['', '', '', '', '']
+}
+
+const getEquitySummary = (param) => {
+  return ['', '', '', '', '', '']
 }
 
 const handleReportTypeChange = () => {
@@ -572,6 +623,24 @@ const initTrendChart = () => {
       border-bottom: 2px solid #409eff;
       color: #303133;
       font-size: 16px;
+    }
+  }
+}
+
+.equity-statement {
+  .total-equity {
+    font-weight: 700;
+    color: #409eff;
+  }
+  
+  :deep(.el-table) {
+    .el-table__row {
+      &:first-child,
+      &:nth-child(2),
+      &:last-child {
+        background-color: #f5f7fa;
+        font-weight: 600;
+      }
     }
   }
 }

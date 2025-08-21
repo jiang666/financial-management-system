@@ -4,7 +4,8 @@
     <div class="search-form">
       <el-form :model="searchForm" inline>
         <el-form-item label="科目选择">
-          <el-select v-model="searchForm.accountCode" placeholder="选择科目" filterable style="width: 200px">
+          <el-select v-model="searchForm.accountCode" placeholder="选择科目(默认显示所有)" filterable style="width: 200px" clearable>
+            <el-option label="全部科目" value="" />
             <el-option
               v-for="account in accountOptions"
               :key="account.code"
@@ -33,13 +34,15 @@
     </div>
     
     <!-- 总账展示 -->
-    <div class="ledger-table" v-if="currentAccount">
+    <div class="ledger-table" v-if="showLedgerTable">
       <div class="account-header">
-        <h3>{{ currentAccount.code }} {{ currentAccount.name }} 总账</h3>
+        <h3>{{ getAccountDisplayName() }} 总账</h3>
         <p>查询期间：{{ searchForm.dateRange?.[0] }} 至 {{ searchForm.dateRange?.[1] }}</p>
       </div>
       
       <el-table :data="ledgerData" v-loading="loading" border>
+        <el-table-column prop="accountCode" label="科目编码" width="120" v-if="!searchForm.accountCode" />
+        <el-table-column prop="accountName" label="科目名称" width="150" v-if="!searchForm.accountCode" />
         <el-table-column prop="date" label="日期" width="100" />
         <el-table-column prop="voucherNo" label="凭证字号" width="140" />
         <el-table-column prop="summary" label="摘要" min-width="200" />
@@ -77,13 +80,11 @@
         </el-descriptions>
       </div>
     </div>
-    
-    <el-empty v-else description="请选择科目查看总账" />
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { mockAccounts } from '@/api/mockData'
 
@@ -105,54 +106,135 @@ const summaryData = ref({
   endBalance: 0
 })
 
+// 计算是否显示总账表格
+const showLedgerTable = computed(() => {
+  return ledgerData.value.length > 0
+})
+
+// 获取账目显示名称
+const getAccountDisplayName = () => {
+  if (!searchForm.value.accountCode) {
+    return '所有科目'
+  }
+  return currentAccount.value ? `${currentAccount.value.code} ${currentAccount.value.name}` : ''
+}
+
 watch(() => searchForm.value.accountCode, (newCode) => {
   if (newCode) {
     currentAccount.value = accountOptions.value.find(acc => acc.code === newCode)
-    loadLedgerData()
+  } else {
+    currentAccount.value = null
   }
+  loadLedgerData()
 })
 
 const loadLedgerData = () => {
-  if (!currentAccount.value) return
-  
   loading.value = true
   setTimeout(() => {
-    // 模拟总账数据
-    ledgerData.value = [
-      {
-        date: '2025-08-01',
-        voucherNo: '记-20250801-001',
-        summary: '期初余额',
-        debitAmount: 0,
-        creditAmount: 0,
-        direction: '借',
-        balance: 100000
-      },
-      {
-        date: '2025-08-02',
-        voucherNo: '记-20250802-001',
-        summary: '销售收入',
-        debitAmount: 50000,
-        creditAmount: 0,
-        direction: '借',
-        balance: 150000
-      },
-      {
-        date: '2025-08-03',
-        voucherNo: '记-20250803-001',
-        summary: '收回货款',
-        debitAmount: 0,
-        creditAmount: 30000,
-        direction: '借',
-        balance: 120000
+    if (!searchForm.value.accountCode) {
+      // 显示所有科目的总账数据
+      ledgerData.value = [
+        {
+          accountCode: '1001',
+          accountName: '库存现金',
+          date: '2025-08-01',
+          voucherNo: '记-20250801-001',
+          summary: '期初余额',
+          debitAmount: 0,
+          creditAmount: 0,
+          direction: '借',
+          balance: 100000
+        },
+        {
+          accountCode: '1001',
+          accountName: '库存现金',
+          date: '2025-08-02',
+          voucherNo: '记-20250802-001',
+          summary: '销售收入',
+          debitAmount: 50000,
+          creditAmount: 0,
+          direction: '借',
+          balance: 150000
+        },
+        {
+          accountCode: '1002',
+          accountName: '银行存款',
+          date: '2025-08-01',
+          voucherNo: '记-20250801-002',
+          summary: '期初余额',
+          debitAmount: 0,
+          creditAmount: 0,
+          direction: '借',
+          balance: 500000
+        },
+        {
+          accountCode: '1002',
+          accountName: '银行存款',
+          date: '2025-08-03',
+          voucherNo: '记-20250803-001',
+          summary: '收到客户转账',
+          debitAmount: 200000,
+          creditAmount: 0,
+          direction: '借',
+          balance: 700000
+        },
+        {
+          accountCode: '1122',
+          accountName: '应收账款',
+          date: '2025-08-04',
+          voucherNo: '记-20250804-001',
+          summary: '销售商品',
+          debitAmount: 80000,
+          creditAmount: 0,
+          direction: '借',
+          balance: 80000
+        }
+      ]
+      
+      summaryData.value = {
+        beginBalance: 600000,
+        totalDebit: 330000,
+        totalCredit: 0,
+        endBalance: 930000
       }
-    ]
-    
-    summaryData.value = {
-      beginBalance: 100000,
-      totalDebit: 50000,
-      totalCredit: 30000,
-      endBalance: 120000
+    } else {
+      // 显示特定科目的总账数据
+      ledgerData.value = [
+        {
+          date: '2025-08-01',
+          voucherNo: '记-20250801-001',
+          summary: '期初余额',
+          debitAmount: 0,
+          creditAmount: 0,
+          direction: '借',
+          balance: 100000
+        },
+        {
+          date: '2025-08-02',
+          voucherNo: '记-20250802-001',
+          summary: '销售收入',
+          debitAmount: 50000,
+          creditAmount: 0,
+          direction: '借',
+          balance: 150000
+        },
+        {
+          date: '2025-08-03',
+          voucherNo: '记-20250803-001',
+          summary: '收回货款',
+          debitAmount: 0,
+          creditAmount: 30000,
+          direction: '借',
+          balance: 120000
+        }
+      ]
+      
+      summaryData.value = {
+        beginBalance: 100000,
+        totalDebit: 50000,
+        totalCredit: 30000,
+        endBalance: 120000
+      }
     }
     
     loading.value = false
@@ -168,13 +250,14 @@ const formatMoney = (amount) => {
 }
 
 const handleSearch = () => {
-  if (!searchForm.value.accountCode) {
-    ElMessage.warning('请先选择科目')
-    return
-  }
   loadLedgerData()
   ElMessage.success('查询完成')
 }
+
+// 页面加载时初始化显示所有账目
+onMounted(() => {
+  loadLedgerData()
+})
 
 const handleExport = () => {
   ElMessage.success('导出功能开发中')

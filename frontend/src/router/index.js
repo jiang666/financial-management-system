@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import store from '@/store'
+import { ElMessage } from 'element-plus'
 
 const routes = [
   {
@@ -225,6 +227,20 @@ const routes = [
         meta: { title: '绩效考核', icon: 'Trophy' }
       }
     ]
+  },
+  {
+    path: '/test',
+    component: () => import('@/layouts/MainLayout.vue'),
+    redirect: '/test/permission',
+    meta: { title: '系统测试', icon: 'Tools' },
+    children: [
+      {
+        path: 'permission',
+        name: 'PermissionTest',
+        component: () => import('@/views/test/PermissionTest.vue'),
+        meta: { title: '权限测试', icon: 'Lock' }
+      }
+    ]
   }
 ]
 
@@ -233,9 +249,48 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
+// 白名单页面，不需要登录即可访问
+const whiteList = ['/login']
+
+router.beforeEach(async (to, from, next) => {
+  // 设置页面标题
   document.title = to.meta.title ? `${to.meta.title} - 财务管理系统` : '财务管理系统'
-  next()
+  
+  // 获取token
+  const hasToken = store.getters.token
+  
+  if (hasToken) {
+    if (to.path === '/login') {
+      // 如果已登录，访问登录页面则重定向到首页
+      next('/dashboard')
+    } else {
+      // 检查是否已有用户信息
+      const hasUserInfo = store.getters.user.id
+      if (hasUserInfo) {
+        next()
+      } else {
+        try {
+          // 尝试初始化用户信息
+          await store.dispatch('initUserInfo')
+          next()
+        } catch (error) {
+          console.error('Failed to get user info:', error)
+          ElMessage.error('获取用户信息失败，请重新登录')
+          await store.dispatch('logout')
+          next('/login')
+        }
+      }
+    }
+  } else {
+    // 没有token
+    if (whiteList.includes(to.path)) {
+      // 在白名单中，直接放行
+      next()
+    } else {
+      // 不在白名单中，重定向到登录页
+      next('/login')
+    }
+  }
 })
 
 export default router

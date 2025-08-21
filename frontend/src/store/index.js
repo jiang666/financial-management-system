@@ -1,5 +1,20 @@
 import { createStore } from 'vuex'
-import { authAPI } from '@/api'
+import { login as loginApi, logout as logoutApi, getCurrentUser, getCurrentUserResources } from '@/api/auth'
+import { 
+  getToken, 
+  setToken, 
+  removeToken, 
+  getRefreshToken, 
+  setRefreshToken, 
+  removeRefreshToken,
+  getUserInfo,
+  setUserInfo,
+  removeUserInfo,
+  getUserResources,
+  setUserResources,
+  removeUserResources,
+  clearAuth
+} from '@/utils/token'
 
 const store = createStore({
   state: {
@@ -8,10 +23,17 @@ const store = createStore({
       username: '',
       realName: '',
       email: '',
-      roles: [],
-      permissions: [],
-      token: localStorage.getItem('token') || ''
+      phone: '',
+      department: '',
+      position: '',
+      status: '',
+      createTime: null,
+      lastLoginTime: null
     },
+    token: getToken() || '',
+    refreshToken: getRefreshToken() || '',
+    authorities: [],
+    resources: getUserResources() || null,
     sidebar: {
       collapsed: false
     },
@@ -24,26 +46,41 @@ const store = createStore({
   mutations: {
     SET_USER(state, user) {
       state.user = { ...state.user, ...user }
+      setUserInfo(state.user)
     },
     SET_TOKEN(state, token) {
-      state.user.token = token
-      if (token) {
-        localStorage.setItem('token', token)
-      } else {
-        localStorage.removeItem('token')
-      }
+      state.token = token
+      setToken(token)
     },
-    CLEAR_USER(state) {
+    SET_REFRESH_TOKEN(state, refreshToken) {
+      state.refreshToken = refreshToken
+      setRefreshToken(refreshToken)
+    },
+    SET_AUTHORITIES(state, authorities) {
+      state.authorities = authorities
+    },
+    SET_RESOURCES(state, resources) {
+      state.resources = resources
+      setUserResources(resources)
+    },
+    CLEAR_AUTH(state) {
       state.user = {
         id: '',
         username: '',
         realName: '',
         email: '',
-        roles: [],
-        permissions: [],
-        token: ''
+        phone: '',
+        department: '',
+        position: '',
+        status: '',
+        createTime: null,
+        lastLoginTime: null
       }
-      localStorage.removeItem('token')
+      state.token = ''
+      state.refreshToken = ''
+      state.authorities = []
+      state.resources = null
+      clearAuth()
     },
     TOGGLE_SIDEBAR(state) {
       state.sidebar.collapsed = !state.sidebar.collapsed
@@ -59,25 +96,15 @@ const store = createStore({
     // 用户登录
     async login({ commit }, userInfo) {
       try {
-        const response = await authAPI.login({
-          username: userInfo.username,
-          password: userInfo.password
-        })
+        const response = await loginApi(userInfo)
+        const { token, refreshToken, userInfo: user, authorities, resources } = response.data
         
-        const { accessToken, userInfo: user, permissions } = response
-        
-        // 保存token
-        commit('SET_TOKEN', accessToken)
-        
-        // 保存用户信息
-        commit('SET_USER', {
-          id: user.id,
-          username: user.username,
-          realName: user.realName,
-          email: user.email,
-          roles: user.roles || [],
-          permissions: permissions || []
-        })
+        // 保存Token和用户信息
+        commit('SET_TOKEN', token)
+        commit('SET_REFRESH_TOKEN', refreshToken)
+        commit('SET_USER', user)
+        commit('SET_AUTHORITIES', authorities || [])
+        commit('SET_RESOURCES', resources || null)
         
         return response
       } catch (error) {
@@ -86,59 +113,107 @@ const store = createStore({
       }
     },
     
-    // 获取用户信息
-    async getCurrentUser({ commit, state }) {
-      if (!state.user.token) {
-        throw new Error('No token found')
-      }
-      
+    // 用户登出
+    async logout({ commit }) {
       try {
-        const userInfo = await authAPI.getCurrentUser()
-        
-        commit('SET_USER', {
-          id: userInfo.id,
-          username: userInfo.username,
-          realName: userInfo.realName,
-          email: userInfo.email,
-          roles: userInfo.roles || []
-        })
-        
-        return userInfo
+        await logoutApi()
+      } catch (error) {
+        console.error('Logout error:', error)
+      } finally {
+        commit('CLEAR_AUTH')
+      }
+    },
+    
+    // 获取用户信息
+    async getUserInfo({ commit }) {
+      try {
+        const response = await getCurrentUser()
+        const user = response.data
+        commit('SET_USER', user)
+        return user
       } catch (error) {
         console.error('Get user info failed:', error)
-        commit('CLEAR_USER')
         throw error
       }
     },
     
-    // 用户登出
-    async logout({ commit }) {
+    // 获取用户权限资源
+    async getUserResources({ commit }) {
       try {
-        await authAPI.logout()
+        const response = await getCurrentUserResources()
+        const resources = response.data
+        commit('SET_RESOURCES', resources)
+        return resources
       } catch (error) {
-        console.error('Logout API failed:', error)
-      } finally {
-        commit('CLEAR_USER')
+        console.error('Get user resources failed:', error)
+        throw error
+      }
+    },
+    
+    // 初始化用户信息（页面刷新时调用）
+    async initUserInfo({ commit, state }) {
+      if (!state.token) {
+        return false
+      }
+      
+      try {
+        // 从localStorage恢复用户信息
+        const cachedUserInfo = getUserInfo()
+        const cachedResources = getUserResources()
+        
+        if (cachedUserInfo) {
+          commit('SET_USER', cachedUserInfo)
+        }
+        
+        if (cachedResources) {
+          commit('SET_RESOURCES', cachedResources)
+        }
+        
+        // 如果没有缓存的用户信息，则重新获取
+        if (!cachedUserInfo) {
+          await this.dispatch('getUserInfo')
+        }
+        
+        if (!cachedResources) {
+          await this.dispatch('getUserResources')
+        }
+        
+        return true
+      } catch (error) {
+        console.error('Init user info failed:', error)
+        commit('CLEAR_AUTH')
+        return false
       }
     }
   },
   getters: {
-    isLoggedIn: state => !!state.user.token,
-    token: state => state.user.token,
+    isLoggedIn: state => !!state.token,
+    token: state => state.token,
+    user: state => state.user,
     username: state => state.user.username,
     realName: state => state.user.realName,
-    userInfo: state => state.user,
-    userRoles: state => state.user.roles,
-    userPermissions: state => state.user.permissions,
+    authorities: state => state.authorities,
+    resources: state => state.resources,
     sidebarCollapsed: state => state.sidebar.collapsed,
     
-    // 权限检查
-    hasPermission: state => permission => {
-      return state.user.permissions.includes(permission)
+    // 检查是否有指定权限
+    hasAuthority: (state) => (authority) => {
+      return state.authorities.includes(authority)
     },
     
-    hasRole: state => role => {
-      return state.user.roles.some(r => r.code === role)
+    // 检查是否有指定资源权限
+    hasResource: (state) => (resourceCode) => {
+      if (!state.resources) return false
+      
+      const checkResource = (resource) => {
+        if (resource.resourceCode === resourceCode) return true
+        if (resource.children) {
+          return resource.children.some(child => checkResource(child))
+        }
+        return false
+      }
+      
+      return checkResource(state.resources)
     }
   }
 })

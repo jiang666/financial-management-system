@@ -1,583 +1,319 @@
 package com.company.financial.service.impl;
 
-import com.company.financial.common.ResponsePageDataEntity;
-import com.company.financial.dto.auth.PermissionDTO;
-import com.company.financial.dto.auth.RoleDTO;
 import com.company.financial.dto.user.*;
-import com.company.financial.entity.Permission;
 import com.company.financial.entity.Role;
 import com.company.financial.entity.User;
 import com.company.financial.entity.UserRole;
-import com.company.financial.exception.BusinessException;
-import com.company.financial.exception.DataNotFoundException;
 import com.company.financial.repository.RoleRepository;
 import com.company.financial.repository.UserRepository;
 import com.company.financial.repository.UserRoleRepository;
 import com.company.financial.service.UserService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.data.domain.*;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import org.springframework.web.multipart.MultipartFile;
 
-import javax.persistence.criteria.Predicate;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.URLEncoder;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 用户管理服务实现
+ * 用户服务实现类
+ * 
+ * @author System
  */
-@Slf4j
 @Service
-@RequiredArgsConstructor
+@Slf4j
 public class UserServiceImpl implements UserService {
     
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
-    private final UserRoleRepository userRoleRepository;
-    private final PasswordEncoder passwordEncoder;
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Autowired
+    private RoleRepository roleRepository;
+    
+    @Autowired
+    private UserRoleRepository userRoleRepository;
+    
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    
+    @Override
+    public Page<UserDetailDTO> findUsers(UserQueryDTO queryDTO) {
+        Pageable pageable = PageRequest.of(queryDTO.getPage(), queryDTO.getSize());
+        
+        Page<User> userPage = userRepository.findUsersByConditions(
+                queryDTO.getUsername(),
+                queryDTO.getRealName(),
+                queryDTO.getDepartment(),
+                queryDTO.getStatus(),
+                0,
+                pageable
+        );
+        
+        List<UserDetailDTO> userDetailDTOs = userPage.getContent().stream()
+                .map(this::convertToDetailDTO)
+                .collect(Collectors.toList());
+        
+        return new PageImpl<>(userDetailDTOs, pageable, userPage.getTotalElements());
+    }
+    
+    @Override
+    public UserDetailDTO findUserById(String id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        
+        if (user.getDeleted() == 1) {
+            throw new RuntimeException("用户已被删除");
+        }
+        
+        return convertToDetailDTO(user);
+    }
     
     @Override
     @Transactional
     public UserDetailDTO createUser(UserCreateDTO createDTO) {
-        log.info("创建用户: {}", createDTO.getUsername());
-        
-        // 检查用户名是否已存在
-        if (userRepository.findByUsernameAndDeletedFalse(createDTO.getUsername()).isPresent()) {
-            throw new BusinessException("用户名已存在");
+        try {
+            log.info("开始创建用户: {}", createDTO.getUsername());
+            
+            // 检查用户名是否已存在
+            if (userRepository.existsByUsernameAndDeleted(createDTO.getUsername(), 0)) {
+                throw new RuntimeException("用户名已存在");
+            }
+            
+            // 检查邮箱是否已存在
+            if (StringUtils.hasText(createDTO.getEmail()) && 
+                userRepository.existsByEmailAndDeleted(createDTO.getEmail(), 0)) {
+                throw new RuntimeException("邮箱已存在");
+            }
+            
+            // 创建用户
+            User user = new User();
+            user.setId(UUID.randomUUID().toString());
+            user.setUsername(createDTO.getUsername());
+            user.setPassword(passwordEncoder.encode(createDTO.getPassword()));
+            user.setRealName(createDTO.getRealName());
+            user.setEmail(createDTO.getEmail());
+            user.setPhone(createDTO.getPhone());
+            user.setDepartment(createDTO.getDepartment());
+            user.setDepartmentId(createDTO.getDepartmentId());
+            user.setPosition(createDTO.getPosition());
+            // 如果未指定状态，默认设置为ACTIVE
+            user.setStatus(StringUtils.hasText(createDTO.getStatus()) ? createDTO.getStatus() : "ACTIVE");
+            user.setDeleted(0);
+            
+            long currentTime = System.currentTimeMillis();
+            user.setCreateTime(currentTime);
+            user.setUpdateTime(currentTime);
+            user.setCreateBy("system"); // TODO: 从当前登录用户获取
+            user.setUpdateBy("system");
+            
+            log.info("保存用户到数据库");
+            user = userRepository.save(user);
+            log.info("用户保存成功，ID: {}", user.getId());
+            
+            // 分配角色
+            if (createDTO.getRoleIds() != null && !createDTO.getRoleIds().isEmpty()) {
+                log.info("分配角色: {}", createDTO.getRoleIds());
+                assignRoles(user.getId(), createDTO.getRoleIds());
+            }
+            
+            log.info("转换为DetailDTO");
+            UserDetailDTO result = convertToDetailDTO(user);
+            log.info("用户创建完成");
+            return result;
+        } catch (Exception e) {
+            log.error("创建用户失败: {}", e.getMessage(), e);
+            throw new RuntimeException("创建用户失败: " + e.getMessage(), e);
         }
-        
-        // 检查邮箱是否已存在
-        if (StringUtils.hasText(createDTO.getEmail()) && 
-            userRepository.findByEmailAndDeletedFalse(createDTO.getEmail()).isPresent()) {
-            throw new BusinessException("邮箱已存在");
-        }
-        
-        // 创建用户实体
-        User user = User.builder()
-                .username(createDTO.getUsername())
-                .password(passwordEncoder.encode(createDTO.getPassword()))
-                .email(createDTO.getEmail())
-                .realName(createDTO.getRealName())
-                .phone(createDTO.getPhone())
-                .departmentId(createDTO.getDepartmentId())
-                .status(createDTO.getStatus())
-                .createdBy(getCurrentUserId())
-                .build();
-        
-        // 保存用户
-        user = userRepository.save(user);
-        
-        // 分配角色
-        if (createDTO.getRoleIds() != null && !createDTO.getRoleIds().isEmpty()) {
-            assignUserRoles(user.getId(), createDTO.getRoleIds());
-        }
-        
-        return convertToDetailDTO(user);
     }
     
     @Override
     @Transactional
-    public UserDetailDTO updateUser(String userId, UserUpdateDTO updateDTO) {
-        log.info("更新用户: {}", userId);
+    public UserDetailDTO updateUser(UserUpdateDTO updateDTO) {
+        User user = userRepository.findById(updateDTO.getId())
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
         
-        User user = getUserEntityById(userId);
-        
-        // 乐观锁检查
-        if (updateDTO.getVersion() != null && !user.getVersion().equals(updateDTO.getVersion())) {
-            throw new BusinessException("数据已被其他用户修改，请刷新后重试");
+        if (user.getDeleted() == 1) {
+            throw new RuntimeException("用户已被删除");
         }
         
-        // 检查邮箱是否已被其他用户使用
-        if (StringUtils.hasText(updateDTO.getEmail()) && 
-            !updateDTO.getEmail().equals(user.getEmail()) &&
-            userRepository.findByEmailAndDeletedFalse(updateDTO.getEmail()).isPresent()) {
-            throw new BusinessException("邮箱已被其他用户使用");
+        // 检查邮箱是否已存在（排除当前用户）
+        if (StringUtils.hasText(updateDTO.getEmail())) {
+            Optional<User> existingUser = userRepository.findByEmailAndDeleted(updateDTO.getEmail(), 0);
+            if (existingUser.isPresent() && !existingUser.get().getId().equals(updateDTO.getId())) {
+                throw new RuntimeException("邮箱已存在");
+            }
         }
         
         // 更新用户信息
-        if (StringUtils.hasText(updateDTO.getEmail())) {
-            user.setEmail(updateDTO.getEmail());
-        }
-        if (StringUtils.hasText(updateDTO.getRealName())) {
-            user.setRealName(updateDTO.getRealName());
-        }
-        if (StringUtils.hasText(updateDTO.getPhone())) {
-            user.setPhone(updateDTO.getPhone());
-        }
-        if (StringUtils.hasText(updateDTO.getDepartmentId())) {
-            user.setDepartmentId(updateDTO.getDepartmentId());
-        }
-        if (updateDTO.getStatus() != null) {
-            user.setStatus(updateDTO.getStatus());
-        }
+        user.setRealName(updateDTO.getRealName());
+        user.setEmail(updateDTO.getEmail());
+        user.setPhone(updateDTO.getPhone());
+        user.setDepartment(updateDTO.getDepartment());
+        user.setDepartmentId(updateDTO.getDepartmentId());
+        user.setStatus(updateDTO.getStatus());
+        user.setUpdateTime(System.currentTimeMillis());
+        user.setUpdateBy("system"); // TODO: 从当前登录用户获取
         
-        user.setUpdatedBy(getCurrentUserId());
         user = userRepository.save(user);
         
-        // 更新角色分配
+        // 更新角色
         if (updateDTO.getRoleIds() != null) {
-            // 先移除所有现有角色
-            userRoleRepository.deleteByUserId(userId);
-            // 重新分配角色
+            userRoleRepository.deleteByUserId(user.getId());
             if (!updateDTO.getRoleIds().isEmpty()) {
-                assignUserRoles(userId, updateDTO.getRoleIds());
+                assignRoles(user.getId(), updateDTO.getRoleIds());
             }
         }
         
         return convertToDetailDTO(user);
-    }
-    
-    @Override
-    public UserDetailDTO getUserById(String userId) {
-        User user = getUserEntityById(userId);
-        return convertToDetailDTO(user);
-    }
-    
-    @Override
-    public UserDetailDTO getUserByUsername(String username) {
-        User user = userRepository.findByUsernameAndDeletedFalse(username)
-                .orElseThrow(() -> new DataNotFoundException("用户不存在"));
-        return convertToDetailDTO(user);
-    }
-    
-    @Override
-    public ResponsePageDataEntity<UserDetailDTO> queryUsers(UserQueryDTO queryDTO) {
-        log.info("查询用户列表: {}", queryDTO);
-        
-        // 构建查询条件
-        Specification<User> spec = (root, query, criteriaBuilder) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            
-            // 未删除的用户
-            predicates.add(criteriaBuilder.isFalse(root.get("deleted")));
-            
-            // 用户名模糊查询
-            if (StringUtils.hasText(queryDTO.getUsername())) {
-                predicates.add(criteriaBuilder.like(root.get("username"), "%" + queryDTO.getUsername() + "%"));
-            }
-            
-            // 邮箱模糊查询
-            if (StringUtils.hasText(queryDTO.getEmail())) {
-                predicates.add(criteriaBuilder.like(root.get("email"), "%" + queryDTO.getEmail() + "%"));
-            }
-            
-            // 真实姓名模糊查询
-            if (StringUtils.hasText(queryDTO.getRealName())) {
-                predicates.add(criteriaBuilder.like(root.get("realName"), "%" + queryDTO.getRealName() + "%"));
-            }
-            
-            // 手机号精确查询
-            if (StringUtils.hasText(queryDTO.getPhone())) {
-                predicates.add(criteriaBuilder.equal(root.get("phone"), queryDTO.getPhone()));
-            }
-            
-            // 部门ID
-            if (StringUtils.hasText(queryDTO.getDepartmentId())) {
-                predicates.add(criteriaBuilder.equal(root.get("departmentId"), queryDTO.getDepartmentId()));
-            }
-            
-            // 状态
-            if (queryDTO.getStatus() != null) {
-                predicates.add(criteriaBuilder.equal(root.get("status"), queryDTO.getStatus()));
-            }
-            
-            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
-        };
-        
-        // 构建排序
-        Sort sort = Sort.by(
-            "desc".equalsIgnoreCase(queryDTO.getSortDir()) ? Sort.Direction.DESC : Sort.Direction.ASC,
-            queryDTO.getSortBy()
-        );
-        
-        // 分页查询
-        Pageable pageable = PageRequest.of(queryDTO.getPage() - 1, queryDTO.getSize(), sort);
-        Page<User> userPage = userRepository.findAll(spec, pageable);
-        
-        // 转换为DTO
-        List<UserDetailDTO> userDTOs = userPage.getContent().stream()
-                .map(this::convertToDetailDTO)
-                .collect(Collectors.toList());
-        
-        return ResponsePageDataEntity.<UserDetailDTO>builder()
-                .content(userDTOs)
-                .totalElements(userPage.getTotalElements())
-                .totalPages(userPage.getTotalPages())
-                .size(userPage.getSize())
-                .number(userPage.getNumber() + 1) // 转换为1开始的页码
-                .numberOfElements(userPage.getNumberOfElements())
-                .first(userPage.isFirst())
-                .last(userPage.isLast())
-                .build();
     }
     
     @Override
     @Transactional
-    public void deleteUser(String userId) {
-        log.info("删除用户: {}", userId);
+    public void deleteUser(String id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
         
-        User user = getUserEntityById(userId);
-        user.setDeleted(true);
-        user.setUpdatedBy(getCurrentUserId());
+        // 逻辑删除
+        user.setDeleted(1);
+        user.setUpdateTime(System.currentTimeMillis());
+        user.setUpdateBy("system"); // TODO: 从当前登录用户获取
+        
         userRepository.save(user);
         
         // 删除用户角色关联
-        userRoleRepository.deleteByUserId(userId);
+        userRoleRepository.deleteByUserId(id);
     }
     
     @Override
     @Transactional
-    public void updateUserStatus(String userId, Integer status) {
-        log.info("更新用户状态: userId={}, status={}", userId, status);
-        
-        User user = getUserEntityById(userId);
-        user.setStatus(status);
-        user.setUpdatedBy(getCurrentUserId());
-        userRepository.save(user);
+    public void deleteUsers(List<String> ids) {
+        for (String id : ids) {
+            deleteUser(id);
+        }
     }
     
     @Override
     @Transactional
-    public void resetUserPassword(String userId, String newPassword) {
-        log.info("重置用户密码: {}", userId);
+    public void resetPassword(String id, String newPassword) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
         
-        User user = getUserEntityById(userId);
+        if (user.getDeleted() == 1) {
+            throw new RuntimeException("用户已被删除");
+        }
+        
         user.setPassword(passwordEncoder.encode(newPassword));
-        user.setUpdatedBy(getCurrentUserId());
+        user.setUpdateTime(System.currentTimeMillis());
+        user.setUpdateBy("system"); // TODO: 从当前登录用户获取
+        
         userRepository.save(user);
     }
     
     @Override
     @Transactional
-    public void assignUserRoles(String userId, List<String> roleIds) {
-        log.info("分配用户角色: userId={}, roleIds={}", userId, roleIds);
+    public void updateStatus(String id, String status) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
         
-        // 验证用户存在
-        getUserEntityById(userId);
-        
-        // 验证角色存在
-        List<Role> roles = roleRepository.findAllById(roleIds);
-        if (roles.size() != roleIds.size()) {
-            throw new BusinessException("部分角色不存在");
+        if (user.getDeleted() == 1) {
+            throw new RuntimeException("用户已被删除");
         }
         
-        // 创建用户角色关联
-        String currentUserId = getCurrentUserId();
-        List<UserRole> userRoles = roleIds.stream()
-                .map(roleId -> UserRole.builder()
-                        .userId(userId)
-                        .roleId(roleId)
-                        .createdBy(currentUserId)
-                        .build())
-                .collect(Collectors.toList());
+        user.setStatus(status);
+        user.setUpdateTime(System.currentTimeMillis());
+        user.setUpdateBy("system"); // TODO: 从当前登录用户获取
         
-        userRoleRepository.saveAll(userRoles);
+        userRepository.save(user);
     }
     
     @Override
     @Transactional
-    public void removeUserRoles(String userId, List<String> roleIds) {
-        log.info("移除用户角色: userId={}, roleIds={}", userId, roleIds);
+    public void assignRoles(String userId, List<String> roleIds) {
+        long currentTime = System.currentTimeMillis();
         
-        userRoleRepository.deleteByUserIdAndRoleIdIn(userId, roleIds);
+        for (String roleId : roleIds) {
+            if (!userRoleRepository.existsByUserIdAndRoleId(userId, roleId)) {
+                UserRole userRole = new UserRole();
+                userRole.setId(UUID.randomUUID().toString());
+                userRole.setUserId(userId);
+                userRole.setRoleId(roleId);
+                userRole.setCreateTime(currentTime);
+                userRole.setCreateBy("system"); // TODO: 从当前登录用户获取
+                
+                userRoleRepository.save(userRole);
+            }
+        }
     }
     
-    private User getUserEntityById(String userId) {
-        return userRepository.findByIdAndDeletedFalse(userId)
-                .orElseThrow(() -> new DataNotFoundException("用户不存在"));
+    @Override
+    @Transactional
+    public void removeRoles(String userId, List<String> roleIds) {
+        for (String roleId : roleIds) {
+            userRoleRepository.deleteByUserId(userId);
+        }
     }
     
+    @Override
+    public List<UserDetailDTO> exportUsers(UserQueryDTO queryDTO) {
+        // 设置大的分页大小以获取所有数据
+        queryDTO.setPage(0);
+        queryDTO.setSize(Integer.MAX_VALUE);
+        
+        Page<UserDetailDTO> page = findUsers(queryDTO);
+        return page.getContent();
+    }
+    
+    /**
+     * 转换为详情DTO
+     */
     private UserDetailDTO convertToDetailDTO(User user) {
-        // 获取用户角色
-        List<UserRole> userRoles = userRoleRepository.findByUserId(user.getId());
-        List<String> roleIds = userRoles.stream()
-                .map(UserRole::getRoleId)
-                .collect(Collectors.toList());
-        
-        List<RoleDTO> roleDTOs = new ArrayList<>();
-        if (!roleIds.isEmpty()) {
-            List<Role> roles = roleRepository.findAllById(roleIds);
-            roleDTOs = roles.stream()
-                    .map(this::convertToRoleDTO)
-                    .collect(Collectors.toList());
-        }
-        
-        return UserDetailDTO.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .realName(user.getRealName())
-                .phone(user.getPhone())
-                .departmentId(user.getDepartmentId())
-                .status(user.getStatus())
-                .lastLoginAt(user.getLastLoginAt())
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
-                .createdBy(user.getCreatedBy())
-                .updatedBy(user.getUpdatedBy())
-                .version(user.getVersion())
-                .roles(roleDTOs)
-                .build();
-    }
-    
-    private RoleDTO convertToRoleDTO(Role role) {
-        // 获取角色权限
-        List<PermissionDTO> permissionDTOs = role.getPermissions().stream()
-                .map(this::convertToPermissionDTO)
-                .collect(Collectors.toList());
-        
-        return RoleDTO.builder()
-                .id(role.getId())
-                .code(role.getCode())
-                .name(role.getName())
-                .description(role.getDescription())
-                .status(role.getStatus())
-                .createdAt(role.getCreatedAt())
-                .permissions(permissionDTOs)
-                .build();
-    }
-    
-    private PermissionDTO convertToPermissionDTO(Permission permission) {
-        return PermissionDTO.builder()
-                .id(permission.getId())
-                .code(permission.getCode())
-                .name(permission.getName())
-                .resource(permission.getResource())
-                .action(permission.getAction())
-                .description(permission.getDescription())
-                .build();
-    }
-    
-    private String getCurrentUserId() {
         try {
-            return SecurityContextHolder.getContext().getAuthentication().getName();
+            log.debug("开始转换用户DTO，用户ID: {}", user.getId());
+            
+            UserDetailDTO dto = new UserDetailDTO();
+            BeanUtils.copyProperties(user, dto);
+            
+            // 手动映射字段名不一致的属性
+            dto.setLastLoginAt(user.getLastLoginTime());
+            dto.setLastLoginIp(user.getLastLoginIp());
+            
+            // 查询用户角色
+            log.debug("查询用户角色，用户ID: {}", user.getId());
+            List<Role> roles;
+            try {
+                roles = roleRepository.findRolesByUserId(user.getId());
+                log.debug("查询到 {} 个角色", roles.size());
+            } catch (Exception e) {
+                log.error("查询用户角色失败，用户ID: {}, 错误: {}", user.getId(), e.getMessage());
+                roles = new ArrayList<>();
+            }
+            
+            List<UserDetailDTO.RoleInfo> roleInfos = roles.stream()
+                    .map(role -> {
+                        UserDetailDTO.RoleInfo roleInfo = new UserDetailDTO.RoleInfo();
+                        roleInfo.setId(role.getId());
+                        roleInfo.setRoleCode(role.getRoleCode());
+                        roleInfo.setName(role.getName());
+                        roleInfo.setDescription(role.getDescription());
+                        return roleInfo;
+                    })
+                    .collect(Collectors.toList());
+            
+            dto.setRoles(roleInfos);
+            
+            log.debug("用户DTO转换完成");
+            return dto;
         } catch (Exception e) {
-            return "system";
-        }
-    }
-    
-    @Override
-    public void exportUsers(UserQueryDTO queryDTO, HttpServletResponse response) throws IOException {
-        log.info("导出用户列表");
-        
-        // 查询用户数据
-        ResponsePageDataEntity<UserDetailDTO> result = queryUsers(queryDTO);
-        List<UserDetailDTO> users = result.getData();
-        
-        // 创建Excel工作簿
-        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("用户列表");
-            
-            // 创建表头样式
-            CellStyle headerStyle = workbook.createCellStyle();
-            Font headerFont = workbook.createFont();
-            headerFont.setBold(true);
-            headerStyle.setFont(headerFont);
-            headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
-            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-            
-            // 创建表头
-            Row headerRow = sheet.createRow(0);
-            String[] headers = {"用户名", "姓名", "邮箱", "手机号", "状态", "角色", "最后登录时间", "创建时间"};
-            for (int i = 0; i < headers.length; i++) {
-                Cell cell = headerRow.createCell(i);
-                cell.setCellValue(headers[i]);
-                cell.setCellStyle(headerStyle);
-            }
-            
-            // 填充数据
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            for (int i = 0; i < users.size(); i++) {
-                Row row = sheet.createRow(i + 1);
-                UserDetailDTO user = users.get(i);
-                
-                row.createCell(0).setCellValue(user.getUsername());
-                row.createCell(1).setCellValue(user.getRealName());
-                row.createCell(2).setCellValue(user.getEmail());
-                row.createCell(3).setCellValue(user.getPhone());
-                row.createCell(4).setCellValue(user.getStatus() == 1 ? "启用" : "禁用");
-                
-                // 角色列表
-                String roles = user.getRoles().stream()
-                        .map(RoleDTO::getName)
-                        .collect(Collectors.joining(", "));
-                row.createCell(5).setCellValue(roles);
-                
-                row.createCell(6).setCellValue(user.getLastLoginAt() != null ? 
-                        user.getLastLoginAt().format(formatter) : "");
-                row.createCell(7).setCellValue(user.getCreatedAt().format(formatter));
-            }
-            
-            // 自动调整列宽
-            for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
-            }
-            
-            // 设置响应头
-            String filename = "用户列表_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
-            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-            response.setCharacterEncoding("UTF-8");
-            response.setHeader("Content-Disposition", 
-                    "attachment; filename=" + URLEncoder.encode(filename, "UTF-8"));
-            
-            // 输出Excel文件
-            try (OutputStream outputStream = response.getOutputStream()) {
-                workbook.write(outputStream);
-                outputStream.flush();
-            }
-        }
-    }
-    
-    @Override
-    public String importUsers(MultipartFile file) {
-        log.info("批量导入用户: filename={}", file.getOriginalFilename());
-        
-        if (file.isEmpty()) {
-            throw new BusinessException("文件不能为空");
-        }
-        
-        int successCount = 0;
-        int failCount = 0;
-        List<String> errorMessages = new ArrayList<>();
-        
-        try (XSSFWorkbook workbook = new XSSFWorkbook(file.getInputStream())) {
-            Sheet sheet = workbook.getSheetAt(0);
-            
-            for (int i = 1; i <= sheet.getLastRowNum(); i++) { // 跳过表头
-                Row row = sheet.getRow(i);
-                if (row == null) continue;
-                
-                try {
-                    UserCreateDTO createDTO = new UserCreateDTO();
-                    createDTO.setUsername(getCellValue(row.getCell(0)));
-                    createDTO.setRealName(getCellValue(row.getCell(1)));
-                    createDTO.setEmail(getCellValue(row.getCell(2)));
-                    createDTO.setPhone(getCellValue(row.getCell(3)));
-                    createDTO.setPassword("123456"); // 默认密码
-                    createDTO.setStatus(1);
-                    
-                    // 验证必填字段
-                    if (StringUtils.isEmpty(createDTO.getUsername()) || 
-                        StringUtils.isEmpty(createDTO.getRealName())) {
-                        errorMessages.add(String.format("第%d行：用户名和姓名不能为空", i + 1));
-                        failCount++;
-                        continue;
-                    }
-                    
-                    // 检查用户名是否已存在
-                    if (userRepository.existsByUsernameAndDeletedFalse(createDTO.getUsername())) {
-                        errorMessages.add(String.format("第%d行：用户名[%s]已存在", i + 1, createDTO.getUsername()));
-                        failCount++;
-                        continue;
-                    }
-                    
-                    createUser(createDTO);
-                    successCount++;
-                    
-                } catch (Exception e) {
-                    errorMessages.add(String.format("第%d行：%s", i + 1, e.getMessage()));
-                    failCount++;
-                }
-            }
-        } catch (IOException e) {
-            throw new BusinessException("文件读取失败：" + e.getMessage());
-        }
-        
-        StringBuilder result = new StringBuilder();
-        result.append(String.format("导入完成：成功%d条，失败%d条", successCount, failCount));
-        if (!errorMessages.isEmpty()) {
-            result.append("\n错误详情：\n");
-            result.append(String.join("\n", errorMessages));
-        }
-        
-        return result.toString();
-    }
-    
-    @Override
-    public void downloadImportTemplate(HttpServletResponse response) throws IOException {
-        log.info("下载用户导入模板");
-        
-        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("用户导入模板");
-            
-            // 创建表头样式
-            CellStyle headerStyle = workbook.createCellStyle();
-            Font headerFont = workbook.createFont();
-            headerFont.setBold(true);
-            headerStyle.setFont(headerFont);
-            headerStyle.setFillForegroundColor(IndexedColors.LIGHT_BLUE.getIndex());
-            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-            
-            // 创建表头
-            Row headerRow = sheet.createRow(0);
-            String[] headers = {"用户名*", "姓名*", "邮箱", "手机号", "备注"};
-            for (int i = 0; i < headers.length; i++) {
-                Cell cell = headerRow.createCell(i);
-                cell.setCellValue(headers[i]);
-                cell.setCellStyle(headerStyle);
-            }
-            
-            // 添加示例数据
-            Row exampleRow = sheet.createRow(1);
-            exampleRow.createCell(0).setCellValue("zhangsan");
-            exampleRow.createCell(1).setCellValue("张三");
-            exampleRow.createCell(2).setCellValue("zhangsan@example.com");
-            exampleRow.createCell(3).setCellValue("13800138000");
-            exampleRow.createCell(4).setCellValue("默认密码：123456");
-            
-            // 自动调整列宽
-            for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
-            }
-            
-            // 设置响应头
-            String filename = "用户导入模板.xlsx";
-            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-            response.setCharacterEncoding("UTF-8");
-            response.setHeader("Content-Disposition", 
-                    "attachment; filename=" + URLEncoder.encode(filename, "UTF-8"));
-            
-            // 输出Excel文件
-            try (OutputStream outputStream = response.getOutputStream()) {
-                workbook.write(outputStream);
-                outputStream.flush();
-            }
-        }
-    }
-    
-    private String getCellValue(Cell cell) {
-        if (cell == null) return "";
-        
-        switch (cell.getCellType()) {
-            case STRING:
-                return cell.getStringCellValue().trim();
-            case NUMERIC:
-                if (DateUtil.isCellDateFormatted(cell)) {
-                    return cell.getDateCellValue().toString();
-                } else {
-                    return String.valueOf((long) cell.getNumericCellValue());
-                }
-            case BOOLEAN:
-                return String.valueOf(cell.getBooleanCellValue());
-            case FORMULA:
-                return cell.getCellFormula();
-            default:
-                return "";
+            log.error("转换用户DTO失败，用户ID: {}, 错误: {}", user.getId(), e.getMessage(), e);
+            throw new RuntimeException("转换用户DTO失败: " + e.getMessage(), e);
         }
     }
 }

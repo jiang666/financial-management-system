@@ -162,6 +162,17 @@
             <span>绩效考核</span>
           </el-menu-item>
         </el-sub-menu>
+        
+        <el-sub-menu index="/test">
+          <template #title>
+            <el-icon><Tools /></el-icon>
+            <span>系统测试</span>
+          </template>
+          <el-menu-item index="/test/permission">
+            <el-icon><Lock /></el-icon>
+            <span>权限测试</span>
+          </el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </el-aside>
     
@@ -224,7 +235,7 @@ const router = useRouter()
 const store = useStore()
 
 const collapsed = computed(() => store.state.sidebar.collapsed)
-const realName = computed(() => store.state.user.realName)
+const realName = computed(() => store.getters.realName || store.getters.username)
 const currentRoute = computed(() => route)
 const activeMenu = computed(() => route.path)
 const sidebarWidth = computed(() => collapsed.value ? '64px' : '240px')
@@ -233,10 +244,15 @@ const toggleSidebar = () => {
   store.commit('TOGGLE_SIDEBAR')
 }
 
-const handleLogout = () => {
-  store.dispatch('logout')
-  ElMessage.success('退出成功')
-  router.push('/login')
+const handleLogout = async () => {
+  try {
+    await store.dispatch('logout')
+    ElMessage.success('退出成功')
+    router.push('/login')
+  } catch (error) {
+    console.error('Logout error:', error)
+    ElMessage.error('退出失败')
+  }
 }
 
 // 修复菜单展开/收起时的布局问题

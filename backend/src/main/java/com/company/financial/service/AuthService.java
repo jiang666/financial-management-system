@@ -1,51 +1,55 @@
 package com.company.financial.service;
 
-import com.company.financial.dto.auth.ChangePasswordDTO;
-import com.company.financial.dto.auth.LoginRequestDTO;
-import com.company.financial.dto.auth.LoginResponseDTO;
-import com.company.financial.dto.auth.RegisterRequestDTO;
-import com.company.financial.dto.auth.UserInfoDTO;
+import com.company.financial.dto.auth.*;
 
 /**
  * 认证服务接口
+ * 
+ * @author System
  */
 public interface AuthService {
     
     /**
      * 用户登录
+     * 
      * @param loginRequest 登录请求
-     * @return 登录响应（包含令牌）
+     * @return 登录响应
      */
     LoginResponseDTO login(LoginRequestDTO loginRequest);
     
     /**
-     * 用户注册
-     * @param registerRequest 注册请求
-     * @return 用户信息
+     * 用户登出
+     * 
+     * @param token JWT Token
      */
-    UserInfoDTO register(RegisterRequestDTO registerRequest);
+    void logout(String token);
     
     /**
-     * 获取当前用户信息
-     * @return 用户信息
-     */
-    UserInfoDTO getCurrentUserInfo();
-    
-    /**
-     * 刷新令牌
-     * @param refreshToken 刷新令牌
-     * @return 新的登录响应
+     * 刷新Token
+     * 
+     * @param refreshToken 刷新Token
+     * @return 新的Token信息
      */
     LoginResponseDTO refreshToken(String refreshToken);
     
     /**
      * 修改密码
-     * @param changePasswordDTO 修改密码请求
+     * 
+     * @param changePasswordDTO 修改密码信息
      */
     void changePassword(ChangePasswordDTO changePasswordDTO);
     
     /**
-     * 登出
+     * 获取当前用户信息
+     * 
+     * @return 用户信息
      */
-    void logout();
+    UserInfoDTO getCurrentUserInfo();
+    
+    /**
+     * 获取当前用户权限资源
+     * 
+     * @return 权限资源树
+     */
+    ResourceDTO getCurrentUserResources();
 }

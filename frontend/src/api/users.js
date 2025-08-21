@@ -1,57 +1,99 @@
-import request from './request'
-import { API_ENDPOINTS } from './config'
+import request from '@/api/request'
 
-// 用户管理API
-export const usersAPI = {
-  // 获取用户列表
-  getUsers(params) {
-    return request({
-      url: API_ENDPOINTS.USERS.LIST,
-      method: 'get',
-      params
-    })
-  },
-  
-  // 创建用户
-  createUser(data) {
-    return request({
-      url: API_ENDPOINTS.USERS.CREATE,
-      method: 'post',
-      data
-    })
-  },
-  
-  // 更新用户
-  updateUser(id, data) {
-    return request({
-      url: API_ENDPOINTS.USERS.UPDATE(id),
-      method: 'put',
-      data
-    })
-  },
-  
-  // 删除用户
-  deleteUser(id) {
-    return request({
-      url: API_ENDPOINTS.USERS.DELETE(id),
-      method: 'delete'
-    })
-  },
-  
-  // 获取用户详情
-  getUserDetail(id) {
-    return request({
-      url: API_ENDPOINTS.USERS.DETAIL(id),
-      method: 'get'
-    })
-  },
-  
-  // 重置用户密码
-  resetPassword(id, newPassword) {
-    return request({
-      url: API_ENDPOINTS.USERS.RESET_PASSWORD(id),
-      method: 'post',
-      data: { newPassword }
-    })
-  }
+// 获取用户列表
+export function getUserList(params) {
+  return request({
+    url: '/v1/users',
+    method: 'get',
+    params
+  })
+}
+
+// 获取用户详情
+export function getUserDetail(id) {
+  return request({
+    url: `/v1/users/${id}`,
+    method: 'get'
+  })
+}
+
+// 创建用户
+export function createUser(data) {
+  return request({
+    url: '/v1/users',
+    method: 'post',
+    data
+  })
+}
+
+// 更新用户
+export function updateUser(id, data) {
+  return request({
+    url: `/v1/users/${id}`,
+    method: 'put',
+    data
+  })
+}
+
+// 删除用户
+export function deleteUser(id) {
+  return request({
+    url: `/v1/users/${id}`,
+    method: 'delete'
+  })
+}
+
+// 批量删除用户
+export function batchDeleteUsers(ids) {
+  return request({
+    url: '/v1/users/batch',
+    method: 'delete',
+    data: { ids }
+  })
+}
+
+// 重置用户密码
+export function resetUserPassword(id, password) {
+  return request({
+    url: `/v1/users/${id}/password`,
+    method: 'put',
+    data: { password }
+  })
+}
+
+// 更新用户状态
+export function updateUserStatus(id, status) {
+  return request({
+    url: `/v1/users/${id}/status`,
+    method: 'put',
+    data: { status }
+  })
+}
+
+// 分配用户角色
+export function assignUserRoles(id, roleIds) {
+  return request({
+    url: `/v1/users/${id}/roles`,
+    method: 'put',
+    data: { roleIds }
+  })
+}
+
+// 移除用户角色
+export function removeUserRoles(id, roleIds) {
+  return request({
+    url: `/v1/users/${id}/roles`,
+    method: 'delete',
+    data: { roleIds }
+  })
+}
+
+// 导出用户数据
+export function exportUsers(params) {
+  return request({
+    url: '/v1/users/export',
+    method: 'get',
+    params,
+    responseType: 'blob'
+  })
 }
