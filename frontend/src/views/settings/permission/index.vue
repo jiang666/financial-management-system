@@ -97,7 +97,7 @@
             <el-table-column label="操作" fixed="right" width="250">
               <template #default="{ row }">
                 <el-button link type="primary" @click="handleEditRole(row)">编辑</el-button>
-                <el-button link type="success" @click="configPermission(row)">权限配置</el-button>
+                <el-button link type="success" @click="configurePermissions(row)">权限配置</el-button>
                 <el-button link type="danger" @click="handleDeleteRole(row)" :disabled="row.userCount > 0">删除</el-button>
               </template>
             </el-table-column>
@@ -179,8 +179,15 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="部门" prop="department">
-              <el-input v-model="userForm.department" />
+            <el-form-item label="部门" prop="departmentId">
+              <el-tree-select
+                v-model="userForm.departmentId"
+                :data="departmentTree"
+                :props="{ label: 'name', value: 'id' }"
+                placeholder="请选择部门"
+                style="width: 100%"
+                @change="handleDepartmentChange"
+              />
             </el-form-item>
           </el-col>
         </el-row>
@@ -263,7 +270,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   getUserList, 
@@ -287,6 +294,7 @@ import {
   getRolePermissions
 } from '@/api/roles'
 import { getResourceTree } from '@/api/resources'
+import { departmentApi } from '@/api/organization'
 
 const activeTab = ref('user')
 const userLoading = ref(false)
@@ -302,6 +310,8 @@ const userData = ref([])
 const roleData = ref([])
 const roleList = ref([])
 const checkedPermissions = ref([])
+const departmentTree = ref([])
+const departmentOptions = ref([])
 
 const userSearchForm = ref({
   username: '',
@@ -315,6 +325,7 @@ const userForm = ref({
   realName: '',
   roleId: '',
   department: '',
+  departmentId: '',
   email: '',
   phone: '',
   status: '启用',
@@ -394,8 +405,9 @@ onMounted(async () => {
   // 只加载默认激活标签页的数据
   if (activeTab.value === 'user') {
     loadUserData()
-    // 用户管理页面需要角色选项
+    // 用户管理页面需要角色选项和部门选项
     await loadRoleOptions()
+    await loadDepartmentTree()
   } else if (activeTab.value === 'role') {
     loadRoleData()
   } else if (activeTab.value === 'permission') {
@@ -407,9 +419,12 @@ onMounted(async () => {
 watch(activeTab, async (newTab, oldTab) => {
   if (newTab === 'user') {
     loadUserData()
-    // 用户管理页面需要角色选项用于用户编辑
+    // 用户管理页面需要角色选项和部门选项
     if (!roleTreeData.value || roleTreeData.value.length === 0) {
       await loadRoleOptions()
+    }
+    if (!departmentTree.value || departmentTree.value.length === 0) {
+      await loadDepartmentTree()
     }
   } else if (newTab === 'role') {
     loadRoleData()
@@ -417,6 +432,39 @@ watch(activeTab, async (newTab, oldTab) => {
     loadResourceTree()
   }
 })
+
+const loadDepartmentTree = async () => {
+  try {
+    const res = await departmentApi.getDepartmentTree()
+    if (res.code === 200) {
+      departmentTree.value = res.data || []
+    }
+  } catch (error) {
+    console.error('获取部门树失败:', error)
+    ElMessage.error('获取部门列表失败')
+  }
+}
+
+const handleDepartmentChange = (departmentId) => {
+  // 找到选中的部门
+  const findDepartment = (nodes, id) => {
+    for (const node of nodes) {
+      if (node.id === id) {
+        return node
+      }
+      if (node.children) {
+        const found = findDepartment(node.children, id)
+        if (found) return found
+      }
+    }
+    return null
+  }
+  
+  const dept = findDepartment(departmentTree.value, departmentId)
+  if (dept) {
+    userForm.value.department = dept.name
+  }
+}
 
 const loadResourceTree = async () => {
   try {
@@ -550,6 +598,7 @@ const handleAddUser = () => {
     realName: '',
     roleId: '',
     department: '',
+    departmentId: '',
     email: '',
     phone: '',
     status: '启用',
@@ -563,6 +612,7 @@ const handleEditUser = (row) => {
   userForm.value = { 
     ...row, 
     roleId: row.roles?.[0]?.id || '',
+    departmentId: row.departmentId || '',
     status: row.status || '启用',
     password: '', 
     confirmPassword: '' 
@@ -636,6 +686,7 @@ const saveUser = async () => {
       email: userForm.value.email,
       phone: userForm.value.phone,
       department: userForm.value.department,
+      departmentId: userForm.value.departmentId,
       position: userForm.value.department // 使用部门作为职位
     }
     
@@ -776,14 +827,26 @@ const resetRoleForm = () => {
   roleFormRef.value?.resetFields()
 }
 
-const configPermission = (row) => {
+const configurePermissions = async (row) => {
   activeTab.value = 'permission'
   selectedRole.value = row
+  // 确保权限树数据已加载
+  if (permissionTreeData.value.length === 0) {
+    await loadResourceTree()
+  }
+  // 等待下一个tick确保DOM已更新
+  await nextTick()
   loadRolePermissions(row.id)
 }
 
-const selectRole = (data) => {
+const selectRole = async (data) => {
   selectedRole.value = data
+  // 确保权限树数据已加载
+  if (permissionTreeData.value.length === 0) {
+    await loadResourceTree()
+  }
+  // 等待下一个tick确保DOM已更新
+  await nextTick()
   loadRolePermissions(data.id)
 }
 
@@ -791,7 +854,15 @@ const loadRolePermissions = async (roleId) => {
   try {
     const res = await getRolePermissions(roleId)
     if (res.code === 200) {
-      checkedPermissions.value = res.data.map(resource => resource.id)
+      // 后端返回的是资源ID数组，直接赋值给checkedPermissions
+      checkedPermissions.value = res.data || []
+      // 等待权限树渲染完成后设置选中状态
+      await nextTick()
+      setTimeout(() => {
+        if (permissionTreeRef.value) {
+          permissionTreeRef.value.setCheckedKeys(checkedPermissions.value)
+        }
+      }, 100)
     }
   } catch (error) {
     ElMessage.error('获取角色权限失败')

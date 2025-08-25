@@ -58,6 +58,9 @@ public class User {
     @Column(name = "position")
     private String position;
     
+    @Column(name = "position_id")
+    private String positionId;
+    
     @Column(name = "status")
     private String status;
     

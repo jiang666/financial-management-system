@@ -2,7 +2,7 @@
 
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:8085/api';
+const API_BASE = 'http://localhost:8086/api';
 let authToken = '';
 
 // 测试登录

@@ -239,10 +239,17 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional
     public void configurePermissions(String roleId, List<String> resourceIds) {
-        long currentTime = System.currentTimeMillis();
+        log.info("开始配置角色权限，角色ID: {}, 权限数量: {}", roleId, resourceIds != null ? resourceIds.size() : 0);
         
-        for (String resourceId : resourceIds) {
-            if (!roleResourceRepository.existsByRoleIdAndResourceId(roleId, resourceId)) {
+        // 先删除该角色的所有现有权限
+        roleResourceRepository.deleteByRoleId(roleId);
+        log.info("已删除角色 {} 的所有现有权限", roleId);
+        
+        // 如果有新权限，则添加
+        if (resourceIds != null && !resourceIds.isEmpty()) {
+            long currentTime = System.currentTimeMillis();
+            
+            for (String resourceId : resourceIds) {
                 RoleResource roleResource = new RoleResource();
                 roleResource.setId(UUID.randomUUID().toString());
                 roleResource.setRoleId(roleId);
@@ -252,6 +259,9 @@ public class RoleServiceImpl implements RoleService {
                 
                 roleResourceRepository.save(roleResource);
             }
+            log.info("已为角色 {} 添加 {} 个新权限", roleId, resourceIds.size());
+        } else {
+            log.info("角色 {} 没有分配任何权限", roleId);
         }
     }
     

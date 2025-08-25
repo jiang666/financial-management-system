@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -84,4 +85,49 @@ public interface UserRepository extends JpaRepository<User, String> {
      * @return 是否存在
      */
     boolean existsByEmailAndDeleted(String email, Integer deleted);
+    
+    /**
+     * 统计部门下的用户数量
+     * 
+     * @param departmentId 部门ID
+     * @param deleted 删除标记
+     * @return 用户数量
+     */
+    Integer countByDepartmentIdAndDeleted(String departmentId, Integer deleted);
+    
+    /**
+     * 根据部门ID查询用户列表
+     * 
+     * @param departmentId 部门ID
+     * @param deleted 删除标记
+     * @return 用户列表
+     */
+    List<User> findByDepartmentIdAndDeleted(String departmentId, Integer deleted);
+    
+    /**
+     * 查询未分配部门的员工
+     * 
+     * @return 可用员工列表
+     */
+    @Query("SELECT u FROM User u WHERE u.departmentId IS NULL AND u.deleted = 0")
+    List<User> findAvailableEmployees();
+    
+    /**
+     * 根据部门ID和岗位ID查询用户
+     * 
+     * @param departmentId 部门ID
+     * @param positionId 岗位ID
+     * @return 用户列表
+     */
+    @Query("SELECT u FROM User u WHERE u.departmentId = :departmentId AND u.positionId = :positionId AND u.deleted = 0")
+    List<User> findByDepartmentIdAndPositionId(@Param("departmentId") String departmentId, @Param("positionId") String positionId);
+    
+    /**
+     * 统计岗位下的用户数量
+     * 
+     * @param positionId 岗位ID
+     * @param deleted 删除标记
+     * @return 用户数量
+     */
+    Integer countByPositionIdAndDeleted(String positionId, Integer deleted);
 }

@@ -15,26 +15,26 @@ import javax.validation.Valid;
 
 /**
  * 认证控制器
- * 
+ *
  * @author System
  */
 @RestController
 @RequestMapping("/v1/auth")
 @Slf4j
 public class AuthController {
-    
+
     @Autowired
     private AuthService authService;
-    
+
     @Value("${jwt.header}")
     private String tokenHeader;
-    
+
     @Value("${jwt.prefix}")
     private String tokenPrefix;
-    
+
     /**
      * 用户登录
-     * 
+     *
      * @param loginRequest 登录请求
      * @return 登录响应
      */
@@ -48,10 +48,10 @@ public class AuthController {
             return ResponseEntity.ok(ResponseData.error("登录失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 用户登出
-     * 
+     *
      * @param request HTTP请求
      * @return 响应结果
      */
@@ -68,10 +68,10 @@ public class AuthController {
             return ResponseEntity.ok(ResponseData.error("登出失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 刷新Token
-     * 
+     *
      * @param request 刷新Token请求
      * @return 新的Token信息
      */
@@ -85,10 +85,10 @@ public class AuthController {
             return ResponseEntity.ok(ResponseData.error("Token刷新失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 修改密码
-     * 
+     *
      * @param changePasswordDTO 修改密码请求
      * @return 响应结果
      */
@@ -102,10 +102,10 @@ public class AuthController {
             return ResponseEntity.ok(ResponseData.error("修改密码失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 获取当前用户信息
-     * 
+     *
      * @return 用户信息
      */
     @GetMapping("/me")
@@ -118,10 +118,10 @@ public class AuthController {
             return ResponseEntity.ok(ResponseData.error("获取用户信息失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 获取当前用户权限资源
-     * 
+     *
      * @return 权限资源树
      */
     @GetMapping("/resources")
@@ -134,10 +134,10 @@ public class AuthController {
             return ResponseEntity.ok(ResponseData.error("获取权限资源失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 验证Token是否有效
-     * 
+     *
      * @param request HTTP请求
      * @return 验证结果
      */
@@ -155,7 +155,7 @@ public class AuthController {
             return ResponseEntity.ok(ResponseData.error("Token验证失败"));
         }
     }
-    
+
     /**
      * 从请求中提取JWT Token
      */
@@ -166,17 +166,17 @@ public class AuthController {
         }
         return null;
     }
-    
+
     /**
      * 刷新Token请求DTO
      */
     public static class RefreshTokenRequest {
         private String refreshToken;
-        
+
         public String getRefreshToken() {
             return refreshToken;
         }
-        
+
         public void setRefreshToken(String refreshToken) {
             this.refreshToken = refreshToken;
         }

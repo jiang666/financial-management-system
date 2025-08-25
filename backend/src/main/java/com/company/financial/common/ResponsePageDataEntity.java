@@ -56,4 +56,17 @@ public class ResponsePageDataEntity<T> {
         this.totalElements = totalElements;
         this.totalPages = totalPages;
     }
+    
+    public static <T> ResponsePageDataEntity<T> success(org.springframework.data.domain.Page<T> page) {
+        ResponsePageDataEntity<T> response = new ResponsePageDataEntity<>();
+        response.setContent(page.getContent());
+        response.setTotalElements(page.getTotalElements());
+        response.setTotalPages(page.getTotalPages());
+        response.setSize(page.getSize());
+        response.setNumber(page.getNumber());
+        response.setNumberOfElements(page.getNumberOfElements());
+        response.setFirst(page.isFirst());
+        response.setLast(page.isLast());
+        return response;
+    }
 }

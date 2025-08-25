@@ -180,15 +180,19 @@
                 </div>
                 
                 <el-table :data="employeeData" border>
-                  <el-table-column prop="name" label="姓名" width="100" />
-                  <el-table-column prop="position" label="岗位" width="120" />
+                  <el-table-column prop="realName" label="姓名" width="100" />
+                  <el-table-column prop="positionName" label="岗位" width="120" />
                   <el-table-column prop="employeeId" label="工号" width="120" />
                   <el-table-column prop="phone" label="联系电话" width="150" />
                   <el-table-column prop="email" label="邮箱" width="180" />
-                  <el-table-column prop="hireDate" label="入职日期" width="120" />
+                  <el-table-column prop="hireDate" label="入职日期" width="120">
+                    <template #default="{ row }">
+                      {{ formatDate(row.hireDate) }}
+                    </template>
+                  </el-table-column>
                   <el-table-column prop="status" label="状态" width="100">
                     <template #default="{ row }">
-                      <el-tag :type="row.status === '在职' ? 'success' : 'info'">
+                      <el-tag :type="getStatusType(row.status)">
                         {{ row.status }}
                       </el-tag>
                     </template>
@@ -271,25 +275,168 @@
         <el-button type="primary" @click="savePosition">确定</el-button>
       </template>
     </el-dialog>
+    
+    <!-- 分配员工对话框 -->
+    <el-dialog v-model="assignEmployeeDialog" title="分配员工" width="600px">
+      <el-form ref="assignFormRef" :model="assignForm" label-width="100px">
+        <el-form-item label="选择员工" prop="userId">
+          <el-select 
+            v-model="assignForm.userId" 
+            filterable 
+            placeholder="请选择员工"
+            style="width: 100%"
+            @change="handleEmployeeSelect"
+          >
+            <el-option
+              v-for="emp in availableEmployees"
+              :key="emp.id"
+              :label="`${emp.realName} (${emp.username})`"
+              :value="emp.id"
+            >
+              <div style="display: flex; justify-content: space-between;">
+                <span>{{ emp.realName }}</span>
+                <span style="color: #8492a6; font-size: 13px">{{ emp.username }}</span>
+              </div>
+            </el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="选择岗位" prop="positionId">
+          <el-select 
+            v-model="assignForm.positionId" 
+            placeholder="请选择岗位（可选）"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="pos in departmentPositions"
+              :key="pos.id"
+              :label="pos.name"
+              :value="pos.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="员工信息" v-if="selectedEmployeeInfo">
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="姓名">{{ selectedEmployeeInfo.realName }}</el-descriptions-item>
+            <el-descriptions-item label="用户名">{{ selectedEmployeeInfo.username }}</el-descriptions-item>
+            <el-descriptions-item label="邮箱">{{ selectedEmployeeInfo.email || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="电话">{{ selectedEmployeeInfo.phone || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="assignEmployeeDialog = false">取消</el-button>
+        <el-button type="primary" @click="confirmAssignEmployee">确定分配</el-button>
+      </template>
+    </el-dialog>
+    
+    <!-- 编辑员工对话框 -->
+    <el-dialog v-model="editEmployeeDialog" title="编辑员工信息" width="500px">
+      <el-form ref="editEmployeeFormRef" :model="editEmployeeForm" label-width="100px">
+        <el-form-item label="员工姓名">
+          <el-input v-model="editEmployeeForm.realName" disabled />
+        </el-form-item>
+        <el-form-item label="当前部门">
+          <el-input v-model="editEmployeeForm.departmentName" disabled />
+        </el-form-item>
+        <el-form-item label="岗位" prop="positionId">
+          <el-select 
+            v-model="editEmployeeForm.positionId" 
+            placeholder="请选择岗位"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="pos in departmentPositions"
+              :key="pos.id"
+              :label="pos.name"
+              :value="pos.id"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editEmployeeDialog = false">取消</el-button>
+        <el-button type="primary" @click="saveEditEmployee">保存</el-button>
+      </template>
+    </el-dialog>
+    
+    <!-- 调动员工对话框 -->
+    <el-dialog v-model="transferEmployeeDialog" title="员工调动" width="600px">
+      <el-form ref="transferFormRef" :model="transferForm" label-width="100px">
+        <el-form-item label="员工信息">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="姓名">{{ transferForm.employeeName }}</el-descriptions-item>
+            <el-descriptions-item label="当前部门">{{ transferForm.fromDepartmentName }}</el-descriptions-item>
+          </el-descriptions>
+        </el-form-item>
+        <el-form-item label="目标部门" prop="toDepartmentId">
+          <el-tree-select
+            v-model="transferForm.toDepartmentId"
+            :data="filteredDepartments"
+            :props="treeProps"
+            node-key="id"
+            placeholder="请选择目标部门"
+            style="width: 100%"
+            @change="handleTargetDepartmentChange"
+          />
+        </el-form-item>
+        <el-form-item label="目标岗位" prop="positionId">
+          <el-select 
+            v-model="transferForm.positionId" 
+            placeholder="请选择岗位（可选）"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="pos in targetDepartmentPositions"
+              :key="pos.id"
+              :label="pos.name"
+              :value="pos.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="调动原因" prop="reason">
+          <el-input 
+            v-model="transferForm.reason" 
+            type="textarea" 
+            rows="3"
+            placeholder="请输入调动原因"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="transferEmployeeDialog = false">取消</el-button>
+        <el-button type="primary" @click="confirmTransferEmployee">确定调动</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { mockOrganizations } from '@/api/mockData'
+import { departmentApi, positionApi, employeeApi } from '@/api/organization'
 
 const activeTab = ref('department')
 const selectedNode = ref(null)
 const deptDialog = ref(false)
 const positionDialog = ref(false)
+const assignEmployeeDialog = ref(false)
+const editEmployeeDialog = ref(false)
+const transferEmployeeDialog = ref(false)
 const deptFormRef = ref()
 const dialogDeptFormRef = ref()
 const positionFormRef = ref()
+const assignFormRef = ref()
+const editEmployeeFormRef = ref()
+const transferFormRef = ref()
 
 const treeData = ref([])
 const positionData = ref([])
 const employeeData = ref([])
+const availableEmployees = ref([])
+const departmentPositions = ref([])
+const targetDepartmentPositions = ref([])
+const selectedEmployeeInfo = ref(null)
+const filteredDepartments = ref([])
 
 const treeProps = {
   children: 'children',
@@ -326,6 +473,28 @@ const positionForm = ref({
   description: ''
 })
 
+const assignForm = ref({
+  userId: '',
+  positionId: ''
+})
+
+const editEmployeeForm = ref({
+  id: '',
+  realName: '',
+  departmentName: '',
+  positionId: ''
+})
+
+const transferForm = ref({
+  userId: '',
+  employeeName: '',
+  fromDepartmentId: '',
+  fromDepartmentName: '',
+  toDepartmentId: '',
+  positionId: '',
+  reason: ''
+})
+
 const deptRules = {
   name: [
     { required: true, message: '请输入部门名称', trigger: 'blur' }
@@ -346,54 +515,75 @@ onMounted(() => {
   loadTreeData()
 })
 
-const loadTreeData = () => {
-  // 构建树形数据
-  const tree = buildTree(mockOrganizations)
-  treeData.value = tree
-}
-
-const buildTree = (data) => {
-  const tree = []
-  const map = {}
+// 监听标签页切换
+watch(activeTab, async (newTab) => {
+  if (!selectedNode.value) return
   
-  data.forEach(item => {
-    map[item.id] = { ...item, children: [] }
-  })
-  
-  data.forEach(item => {
-    if (item.parentId && map[item.parentId]) {
-      map[item.parentId].children.push(map[item.id])
-    } else if (!item.parentId) {
-      tree.push(map[item.id])
+  try {
+    switch (newTab) {
+      case 'department':
+        // 部门信息已经在选中节点时加载，不需要重新加载
+        break
+      case 'position':
+        await loadPositionData(selectedNode.value.id)
+        break
+      case 'employee':
+        await loadEmployeeData(selectedNode.value.id)
+        break
     }
-  })
-  
-  return tree
+  } catch (error) {
+    console.error('切换标签页加载数据失败:', error)
+  }
+})
+
+const loadTreeData = async () => {
+  try {
+    const res = await departmentApi.getDepartmentTree()
+    if (res.code === 200) {
+      treeData.value = res.data || []
+    } else {
+      ElMessage.error(res.message || '获取部门树失败')
+    }
+  } catch (error) {
+    console.error('获取部门树失败:', error)
+    ElMessage.error('获取部门树失败')
+  }
 }
 
-const handleNodeClick = (data) => {
+
+const handleNodeClick = async (data) => {
   selectedNode.value = data
-  deptForm.value = { ...data, status: data.status || '启用' }
-  loadPositionData(data.id)
-  loadEmployeeData(data.id)
+  deptForm.value = { ...data }
+  await loadPositionData(data.id)
+  await loadEmployeeData(data.id)
 }
 
-const loadPositionData = (deptId) => {
-  // 模拟岗位数据
-  positionData.value = [
-    { id: 1, name: '部门经理', level: '高级', count: 1, actualCount: 1, salary: 15000, status: '启用' },
-    { id: 2, name: '主管', level: '中级', count: 2, actualCount: 1, salary: 10000, status: '启用' },
-    { id: 3, name: '专员', level: '初级', count: 5, actualCount: 3, salary: 6000, status: '启用' }
-  ]
+const loadPositionData = async (deptId) => {
+  try {
+    const res = await departmentApi.getDepartmentPositions(deptId)
+    if (res.code === 200) {
+      positionData.value = res.data || []
+    } else {
+      ElMessage.error(res.message || '获取岗位列表失败')
+    }
+  } catch (error) {
+    console.error('获取岗位列表失败:', error)
+    ElMessage.error('获取岗位列表失败')
+  }
 }
 
-const loadEmployeeData = (deptId) => {
-  // 模拟员工数据
-  employeeData.value = [
-    { id: 1, name: '张三', position: '部门经理', employeeId: 'EMP001', phone: '13800138001', email: 'zhang@example.com', hireDate: '2023-01-15', status: '在职' },
-    { id: 2, name: '李四', position: '专员', employeeId: 'EMP002', phone: '13800138002', email: 'li@example.com', hireDate: '2023-03-20', status: '在职' },
-    { id: 3, name: '王五', position: '专员', employeeId: 'EMP003', phone: '13800138003', email: 'wang@example.com', hireDate: '2023-06-10', status: '在职' }
-  ]
+const loadEmployeeData = async (deptId) => {
+  try {
+    const res = await employeeApi.getDepartmentEmployees(deptId)
+    if (res.code === 200) {
+      employeeData.value = res.data || []
+    } else {
+      ElMessage.error(res.message || '获取员工列表失败')
+    }
+  } catch (error) {
+    console.error('获取员工列表失败:', error)
+    ElMessage.error('获取员工列表失败')
+  }
 }
 
 const getLevelTagType = (level) => {
@@ -410,6 +600,27 @@ const formatMoney = (amount) => {
     style: 'currency',
     currency: 'CNY'
   }).format(amount)
+}
+
+const formatDate = (timestamp) => {
+  if (!timestamp) return '-'
+  const date = new Date(timestamp)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getStatusType = (status) => {
+  const statusMap = {
+    'ACTIVE': 'success',
+    'INACTIVE': 'danger',
+    'PENDING': 'warning',
+    '在职': 'success',
+    '离职': 'info',
+    '休假': 'warning'
+  }
+  return statusMap[status] || 'info'
 }
 
 const handleAddRoot = () => {
@@ -454,10 +665,30 @@ const handleDelete = async (data) => {
         type: 'warning'
       }
     )
-    ElMessage.success('删除成功')
-    loadTreeData()
-  } catch {
-    // 取消删除
+    
+    const res = await departmentApi.deleteDepartment(data.id)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      await loadTreeData()
+      selectedNode.value = null
+      deptForm.value = {
+        id: '',
+        name: '',
+        type: '部门',
+        parentId: null,
+        manager: '',
+        phone: '',
+        status: '启用',
+        description: ''
+      }
+    } else {
+      ElMessage.error(res.message || '删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除部门失败:', error)
+      ElMessage.error('删除失败')
+    }
   }
 }
 
@@ -465,8 +696,28 @@ const saveDepartment = async () => {
   const valid = await deptFormRef.value.validate().catch(() => false)
   if (!valid) return
   
-  ElMessage.success('部门信息保存成功')
-  loadTreeData()
+  try {
+    const data = {
+      name: deptForm.value.name,
+      type: deptForm.value.type,
+      parentId: deptForm.value.parentId,
+      managerId: deptForm.value.managerId,
+      phone: deptForm.value.phone,
+      status: deptForm.value.status,
+      description: deptForm.value.description
+    }
+    
+    const res = await departmentApi.updateDepartment(deptForm.value.id, data)
+    if (res.code === 200) {
+      ElMessage.success('部门信息保存成功')
+      await loadTreeData()
+    } else {
+      ElMessage.error(res.message || '保存失败')
+    }
+  } catch (error) {
+    console.error('保存部门信息失败:', error)
+    ElMessage.error('保存失败')
+  }
 }
 
 const resetDeptForm = () => {
@@ -477,9 +728,34 @@ const saveDeptDialog = async () => {
   const valid = await dialogDeptFormRef.value.validate().catch(() => false)
   if (!valid) return
   
-  deptDialog.value = false
-  ElMessage.success(dialogDeptForm.value.id ? '编辑成功' : '新增成功')
-  loadTreeData()
+  try {
+    const data = {
+      name: dialogDeptForm.value.name,
+      type: dialogDeptForm.value.type,
+      parentId: dialogDeptForm.value.parentId,
+      managerId: dialogDeptForm.value.managerId,
+      phone: dialogDeptForm.value.phone,
+      description: dialogDeptForm.value.description
+    }
+    
+    let res
+    if (dialogDeptForm.value.id) {
+      res = await departmentApi.updateDepartment(dialogDeptForm.value.id, data)
+    } else {
+      res = await departmentApi.createDepartment(data)
+    }
+    
+    if (res.code === 200) {
+      deptDialog.value = false
+      ElMessage.success(dialogDeptForm.value.id ? '编辑成功' : '新增成功')
+      await loadTreeData()
+    } else {
+      ElMessage.error(res.message || '操作失败')
+    }
+  } catch (error) {
+    console.error('保存部门失败:', error)
+    ElMessage.error('操作失败')
+  }
 }
 
 const handleAddPosition = () => {
@@ -510,29 +786,261 @@ const deletePosition = async (row) => {
         type: 'warning'
       }
     )
-    ElMessage.success('删除成功')
-    loadPositionData(selectedNode.value.id)
-  } catch {
-    // 取消删除
+    
+    const res = await positionApi.deletePosition(row.id)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      await loadPositionData(selectedNode.value.id)
+    } else {
+      ElMessage.error(res.message || '删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除岗位失败:', error)
+      ElMessage.error('删除失败')
+    }
   }
 }
 
-const savePosition = () => {
-  positionDialog.value = false
-  ElMessage.success(positionForm.value.id ? '编辑成功' : '新增成功')
-  loadPositionData(selectedNode.value.id)
+const savePosition = async () => {
+  try {
+    const data = {
+      departmentId: selectedNode.value.id,
+      name: positionForm.value.name,
+      level: positionForm.value.level,
+      count: positionForm.value.count,
+      salary: positionForm.value.salary,
+      description: positionForm.value.description
+    }
+    
+    let res
+    if (positionForm.value.id) {
+      // 更新时不需要departmentId
+      delete data.departmentId
+      data.status = positionForm.value.status || '启用'
+      res = await positionApi.updatePosition(positionForm.value.id, data)
+    } else {
+      res = await positionApi.createPosition(data)
+    }
+    
+    if (res.code === 200) {
+      positionDialog.value = false
+      ElMessage.success(positionForm.value.id ? '编辑成功' : '新增成功')
+      await loadPositionData(selectedNode.value.id)
+    } else {
+      ElMessage.error(res.message || '操作失败')
+    }
+  } catch (error) {
+    console.error('保存岗位失败:', error)
+    ElMessage.error('操作失败')
+  }
 }
 
-const handleAddEmployee = () => {
-  ElMessage.info('员工分配功能开发中')
+const handleAddEmployee = async () => {
+  try {
+    const res = await employeeApi.getAvailableEmployees()
+    if (res.code === 200) {
+      availableEmployees.value = res.data || []
+      
+      if (availableEmployees.value.length === 0) {
+        ElMessage.warning('暂无可分配的员工')
+        return
+      }
+      
+      // 加载当前部门的岗位列表
+      const posRes = await departmentApi.getDepartmentPositions(selectedNode.value.id)
+      if (posRes.code === 200) {
+        departmentPositions.value = posRes.data || []
+      }
+      
+      // 重置表单
+      assignForm.value = {
+        userId: '',
+        positionId: ''
+      }
+      selectedEmployeeInfo.value = null
+      
+      assignEmployeeDialog.value = true
+    } else {
+      ElMessage.error(res.message || '获取可用员工失败')
+    }
+  } catch (error) {
+    console.error('打开分配员工对话框失败:', error)
+    ElMessage.error('打开分配员工对话框失败')
+  }
 }
 
-const editEmployee = (row) => {
-  ElMessage.info(`编辑员工：${row.name}`)
+const handleEmployeeSelect = (userId) => {
+  selectedEmployeeInfo.value = availableEmployees.value.find(emp => emp.id === userId)
 }
 
-const transferEmployee = (row) => {
-  ElMessage.info(`调动员工：${row.name}`)
+const confirmAssignEmployee = async () => {
+  try {
+    if (!assignForm.value.userId) {
+      ElMessage.warning('请选择要分配的员工')
+      return
+    }
+    
+    const assignRes = await employeeApi.assignEmployee(selectedNode.value.id, {
+      userId: assignForm.value.userId,
+      departmentId: selectedNode.value.id,
+      positionId: assignForm.value.positionId
+    })
+    
+    if (assignRes.code === 200) {
+      ElMessage.success('分配成功')
+      assignEmployeeDialog.value = false
+      await loadEmployeeData(selectedNode.value.id)
+      await loadTreeData() // 刷新树结构更新员工数量
+    } else {
+      ElMessage.error(assignRes.message || '分配失败')
+    }
+  } catch (error) {
+    console.error('分配员工失败:', error)
+    ElMessage.error('分配失败')
+  }
+}
+
+const editEmployee = async (row) => {
+  try {
+    // 加载当前部门的岗位列表
+    const posRes = await departmentApi.getDepartmentPositions(selectedNode.value.id)
+    if (posRes.code === 200) {
+      departmentPositions.value = posRes.data || []
+    }
+    
+    // 设置编辑表单数据
+    editEmployeeForm.value = {
+      id: row.id,
+      realName: row.realName,
+      departmentName: selectedNode.value.name,
+      positionId: row.positionId || ''
+    }
+    
+    editEmployeeDialog.value = true
+  } catch (error) {
+    console.error('打开编辑员工对话框失败:', error)
+    ElMessage.error('打开编辑员工对话框失败')
+  }
+}
+
+const saveEditEmployee = async () => {
+  try {
+    // 更新员工的岗位信息
+    const updateRes = await employeeApi.assignEmployee(selectedNode.value.id, {
+      userId: editEmployeeForm.value.id,
+      departmentId: selectedNode.value.id,
+      positionId: editEmployeeForm.value.positionId
+    })
+    
+    if (updateRes.code === 200) {
+      ElMessage.success('更新成功')
+      editEmployeeDialog.value = false
+      await loadEmployeeData(selectedNode.value.id)
+    } else {
+      ElMessage.error(updateRes.message || '更新失败')
+    }
+  } catch (error) {
+    console.error('更新员工信息失败:', error)
+    ElMessage.error('更新失败')
+  }
+}
+
+const transferEmployee = async (row) => {
+  try {
+    // 获取部门树用于选择目标部门
+    const treeRes = await departmentApi.getDepartmentTree()
+    if (treeRes.code !== 200 || !treeRes.data || treeRes.data.length === 0) {
+      ElMessage.error('获取部门列表失败')
+      return
+    }
+    
+    // 过滤掉当前部门
+    const filterCurrentDepartment = (nodes) => {
+      return nodes.filter(node => node.id !== selectedNode.value.id).map(node => {
+        if (node.children && node.children.length > 0) {
+          return {
+            ...node,
+            children: filterCurrentDepartment(node.children)
+          }
+        }
+        return node
+      })
+    }
+    
+    filteredDepartments.value = filterCurrentDepartment(treeRes.data)
+    
+    if (filteredDepartments.value.length === 0) {
+      ElMessage.warning('没有其他部门可供调动')
+      return
+    }
+    
+    // 设置调动表单数据
+    transferForm.value = {
+      userId: row.id,
+      employeeName: row.realName,
+      fromDepartmentId: selectedNode.value.id,
+      fromDepartmentName: selectedNode.value.name,
+      toDepartmentId: '',
+      positionId: '',
+      reason: ''
+    }
+    
+    targetDepartmentPositions.value = []
+    transferEmployeeDialog.value = true
+  } catch (error) {
+    console.error('打开调动员工对话框失败:', error)
+    ElMessage.error('打开调动员工对话框失败')
+  }
+}
+
+const handleTargetDepartmentChange = async (departmentId) => {
+  try {
+    // 加载目标部门的岗位列表
+    const posRes = await departmentApi.getDepartmentPositions(departmentId)
+    if (posRes.code === 200) {
+      targetDepartmentPositions.value = posRes.data || []
+    }
+    // 清空已选岗位
+    transferForm.value.positionId = ''
+  } catch (error) {
+    console.error('获取目标部门岗位失败:', error)
+    targetDepartmentPositions.value = []
+  }
+}
+
+const confirmTransferEmployee = async () => {
+  try {
+    if (!transferForm.value.toDepartmentId) {
+      ElMessage.warning('请选择目标部门')
+      return
+    }
+    
+    if (!transferForm.value.reason) {
+      ElMessage.warning('请输入调动原因')
+      return
+    }
+    
+    const transferRes = await employeeApi.transferEmployee({
+      userId: transferForm.value.userId,
+      fromDepartmentId: transferForm.value.fromDepartmentId,
+      toDepartmentId: transferForm.value.toDepartmentId,
+      positionId: transferForm.value.positionId,
+      reason: transferForm.value.reason
+    })
+    
+    if (transferRes.code === 200) {
+      ElMessage.success('调动成功')
+      transferEmployeeDialog.value = false
+      await loadEmployeeData(selectedNode.value.id)
+      await loadTreeData() // 刷新树结构更新员工数量
+    } else {
+      ElMessage.error(transferRes.message || '调动失败')
+    }
+  } catch (error) {
+    console.error('调动员工失败:', error)
+    ElMessage.error('调动失败')
+  }
 }
 </script>
 

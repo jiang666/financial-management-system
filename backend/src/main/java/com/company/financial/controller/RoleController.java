@@ -16,20 +16,20 @@ import java.util.Map;
 
 /**
  * 角色管理控制器
- * 
+ *
  * @author System
  */
 @RestController
 @RequestMapping("/v1/roles")
 @Slf4j
 public class RoleController {
-    
+
     @Autowired
     private RoleService roleService;
-    
+
     /**
      * 分页查询角色列表
-     * 
+     *
      * @param queryDTO 查询条件
      * @return 角色分页数据
      */
@@ -43,10 +43,10 @@ public class RoleController {
             return ResponseEntity.ok(ResponsePageData.success("查询失败: " + e.getMessage(), Page.empty()));
         }
     }
-    
+
     /**
      * 查询所有角色列表
-     * 
+     *
      * @return 角色列表
      */
     @GetMapping("/all")
@@ -59,10 +59,10 @@ public class RoleController {
             return ResponseEntity.ok(ResponseData.error("查询失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 根据ID查询角色详情
-     * 
+     *
      * @param id 角色ID
      * @return 角色详情
      */
@@ -76,10 +76,10 @@ public class RoleController {
             return ResponseEntity.ok(ResponseData.error("查询失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 创建角色
-     * 
+     *
      * @param createDTO 创建信息
      * @return 角色详情
      */
@@ -94,17 +94,17 @@ public class RoleController {
             return ResponseEntity.ok(ResponseData.error("创建失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 更新角色
-     * 
+     *
      * @param id 角色ID
      * @param updateDTO 更新信息
      * @return 角色详情
      */
     @PutMapping("/{id}")
-    public ResponseEntity<ResponseData<RoleDetailDTO>> updateRole(@PathVariable String id, 
-                                                                @Valid @RequestBody RoleUpdateDTO updateDTO) {
+    public ResponseEntity<ResponseData<RoleDetailDTO>> updateRole(@PathVariable String id,
+                                                                  @Valid @RequestBody RoleUpdateDTO updateDTO) {
         try {
             updateDTO.setId(id);
             RoleDetailDTO role = roleService.updateRole(updateDTO);
@@ -114,10 +114,10 @@ public class RoleController {
             return ResponseEntity.ok(ResponseData.error("更新失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 删除角色
-     * 
+     *
      * @param id 角色ID
      * @return 响应结果
      */
@@ -131,10 +131,10 @@ public class RoleController {
             return ResponseEntity.ok(ResponseData.error("删除失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 批量删除角色
-     * 
+     *
      * @param request 角色ID列表
      * @return 响应结果
      */
@@ -149,17 +149,17 @@ public class RoleController {
             return ResponseEntity.ok(ResponseData.error("删除失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 更新角色状态
-     * 
+     *
      * @param id 角色ID
      * @param request 状态信息
      * @return 响应结果
      */
     @PutMapping("/{id}/status")
-    public ResponseEntity<ResponseData<Object>> updateStatus(@PathVariable String id, 
-                                                          @RequestBody Map<String, String> request) {
+    public ResponseEntity<ResponseData<Object>> updateStatus(@PathVariable String id,
+                                                             @RequestBody Map<String, String> request) {
         try {
             String status = request.get("status");
             roleService.updateStatus(id, status);
@@ -169,17 +169,17 @@ public class RoleController {
             return ResponseEntity.ok(ResponseData.error("更新失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 配置角色权限
-     * 
+     *
      * @param id 角色ID
      * @param request 资源ID列表
      * @return 响应结果
      */
     @PutMapping("/{id}/permissions")
-    public ResponseEntity<ResponseData<Object>> configurePermissions(@PathVariable String id, 
-                                                                  @RequestBody Map<String, List<String>> request) {
+    public ResponseEntity<ResponseData<Object>> configurePermissions(@PathVariable String id,
+                                                                     @RequestBody Map<String, List<String>> request) {
         try {
             List<String> resourceIds = request.get("resourceIds");
             roleService.configurePermissions(id, resourceIds);
@@ -189,10 +189,10 @@ public class RoleController {
             return ResponseEntity.ok(ResponseData.error("配置失败: " + e.getMessage()));
         }
     }
-    
+
     /**
      * 获取角色权限列表
-     * 
+     *
      * @param id 角色ID
      * @return 权限列表
      */

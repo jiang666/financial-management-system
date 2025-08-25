@@ -184,3 +184,19 @@ htmlcov/
 TODO.txt
 NOTES.txt
 local-config/
+
+# Root level node_modules
+/node_modules/
+/package-lock.json
+/package.json
+
+# Test scripts
+test-*.js
+check-*.js
+execute-*.js
+insert-*.js
+update-*.js
+sync-*.js
+
+# Null files
+nul

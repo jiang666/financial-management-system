@@ -103,7 +103,8 @@ public class UserServiceImpl implements UserService {
             user.setPhone(createDTO.getPhone());
             user.setDepartment(createDTO.getDepartment());
             user.setDepartmentId(createDTO.getDepartmentId());
-            user.setPosition(createDTO.getPosition());
+            // 创建用户时不设置岗位，需要通过部门分配功能来设置
+            // user.setPosition(createDTO.getPosition());
             // 如果未指定状态，默认设置为ACTIVE
             user.setStatus(StringUtils.hasText(createDTO.getStatus()) ? createDTO.getStatus() : "ACTIVE");
             user.setDeleted(0);
