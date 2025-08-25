@@ -1,0 +1,52 @@
+{
+  "testTime": "2025-08-25T05:07:40.743Z",
+  "apiBaseUrl": "http://localhost:8086/api",
+  "summary": {
+    "total": 10,
+    "passed": 1,
+    "failed": 9,
+    "passRate": "10.00%"
+  },
+  "details": [
+    {
+      "name": "获取参数列表",
+      "success": false
+    },
+    {
+      "name": "获取单个参数",
+      "success": false
+    },
+    {
+      "name": "更新参数",
+      "success": false
+    },
+    {
+      "name": "批量更新参数",
+      "success": false
+    },
+    {
+      "name": "获取参数分类",
+      "success": false
+    },
+    {
+      "name": "验证参数值",
+      "success": false
+    },
+    {
+      "name": "刷新参数缓存",
+      "success": false
+    },
+    {
+      "name": "获取参数历史",
+      "success": false
+    },
+    {
+      "name": "导出参数配置",
+      "success": false
+    },
+    {
+      "name": "权限控制",
+      "success": true
+    }
+  ]
+}

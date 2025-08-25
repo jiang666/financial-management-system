@@ -24,7 +24,13 @@
       "Bash(java:*)",
       "Bash(./mvnw:*)",
       "Bash(jps:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(npm install)",
+      "Bash(npm install:*)",
+      "Bash(powershell:*)",
+      "Bash(dir:*)",
+      "Bash(git reset:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }

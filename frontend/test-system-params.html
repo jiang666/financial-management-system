@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统参数接口测试</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #409EFF;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #409EFF;
+        }
+        button {
+            background: #409EFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #66b1ff;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-left: 4px solid #409EFF;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            border-left-color: #F56C6C;
+            background: #fef0f0;
+        }
+        .success {
+            border-left-color: #67C23A;
+            background: #f0f9ff;
+        }
+        input, select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .param-form {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 10px;
+            align-items: center;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>系统参数接口测试</h1>
+        
+        <div class="test-section">
+            <h3>1. 登录系统</h3>
+            <button onclick="login()">登录</button>
+            <div id="loginResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. 获取参数列表</h3>
+            <select id="categorySelect">
+                <option value="">全部分类</option>
+                <option value="BASIC">基础设置</option>
+                <option value="FINANCIAL">财务核算</option>
+                <option value="SYSTEM">系统管理</option>
+                <option value="REPORT">报表参数</option>
+            </select>
+            <button onclick="getParameters()">获取参数列表</button>
+            <div id="parametersResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. 获取单个参数</h3>
+            <input type="text" id="paramKey" placeholder="参数键，如：company.name" style="width: 300px">
+            <button onclick="getParameter()">获取参数</button>
+            <div id="parameterResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. 更新参数</h3>
+            <div class="param-form">
+                <label>参数键：</label>
+                <input type="text" id="updateKey" placeholder="如：company.name" style="width: 300px">
+                <label>参数值：</label>
+                <input type="text" id="updateValue" placeholder="新的参数值" style="width: 300px">
+            </div>
+            <button onclick="updateParameter()">更新参数</button>
+            <div id="updateResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. 批量更新参数</h3>
+            <p>更新企业信息（测试数据）</p>
+            <button onclick="batchUpdate()">批量更新</button>
+            <div id="batchResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>6. 其他操作</h3>
+            <button onclick="getCategories()">获取参数分类</button>
+            <button onclick="validateParam()">验证参数值</button>
+            <button onclick="refreshCache()">刷新缓存</button>
+            <button onclick="exportConfig()">导出配置</button>
+            <div id="otherResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        // API基础配置
+        const API_BASE = 'http://localhost:8086/api';
+        let authToken = '';
+
+        // axios实例
+        const api = axios.create({
+            baseURL: API_BASE,
+            timeout: 10000,
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        // 请求拦截器
+        api.interceptors.request.use(config => {
+            if (authToken) {
+                config.headers['Authorization'] = `Bearer ${authToken}`;
+            }
+            return config;
+        });
+
+        // 响应拦截器
+        api.interceptors.response.use(
+            response => response,
+            error => {
+                console.error('API Error:', error);
+                return Promise.reject(error);
+            }
+        );
+
+        // 显示结果
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+            element.className = 'result ' + (isError ? 'error' : 'success');
+        }
+
+        // 1. 登录
+        async function login() {
+            try {
+                const res = await api.post('/v1/auth/login', {
+                    username: 'admin',
+                    password: 'admin123'
+                });
+                
+                if (res.data.code === 200 && res.data.data) {
+                    authToken = res.data.data.token;
+                    showResult('loginResult', {
+                        message: '登录成功',
+                        user: res.data.data.user,
+                        permissions: res.data.data.permissions
+                    });
+                } else {
+                    showResult('loginResult', res.data, true);
+                }
+            } catch (error) {
+                showResult('loginResult', error.response?.data || error.message, true);
+            }
+        }
+
+        // 2. 获取参数列表
+        async function getParameters() {
+            const category = document.getElementById('categorySelect').value;
+            try {
+                const res = await api.get('/v1/system/parameters', {
+                    params: { category, page: 0, size: 20 }
+                });
+                showResult('parametersResult', res.data);
+            } catch (error) {
+                showResult('parametersResult', error.response?.data || error.message, true);
+            }
+        }
+
+        // 3. 获取单个参数
+        async function getParameter() {
+            const key = document.getElementById('paramKey').value;
+            if (!key) {
+                showResult('parameterResult', '请输入参数键', true);
+                return;
+            }
+            
+            try {
+                const res = await api.get(`/v1/system/parameters/${key}`);
+                showResult('parameterResult', res.data);
+            } catch (error) {
+                showResult('parameterResult', error.response?.data || error.message, true);
+            }
+        }
+
+        // 4. 更新参数
+        async function updateParameter() {
+            const key = document.getElementById('updateKey').value;
+            const value = document.getElementById('updateValue').value;
+            
+            if (!key || !value) {
+                showResult('updateResult', '请输入参数键和值', true);
+                return;
+            }
+            
+            try {
+                const res = await api.put(`/v1/system/parameters/${key}`, {
+                    paramValue: value
+                });
+                showResult('updateResult', res.data);
+            } catch (error) {
+                showResult('updateResult', error.response?.data || error.message, true);
+            }
+        }
+
+        // 5. 批量更新
+        async function batchUpdate() {
+            try {
+                const res = await api.post('/v1/system/parameters/batch', {
+                    parameters: [
+                        { paramKey: 'company.name', paramValue: '测试公司' + Date.now() },
+                        { paramKey: 'company.code', paramValue: 'TEST' + Date.now() }
+                    ]
+                });
+                showResult('batchResult', res.data);
+            } catch (error) {
+                showResult('batchResult', error.response?.data || error.message, true);
+            }
+        }
+
+        // 6. 获取参数分类
+        async function getCategories() {
+            try {
+                const res = await api.get('/v1/system/parameters/categories');
+                showResult('otherResult', res.data);
+            } catch (error) {
+                showResult('otherResult', error.response?.data || error.message, true);
+            }
+        }
+
+        // 7. 验证参数值
+        async function validateParam() {
+            try {
+                const res = await api.post('/v1/system/parameters/validate', {
+                    paramKey: 'password.min_length',
+                    paramValue: '10'
+                });
+                showResult('otherResult', res.data);
+            } catch (error) {
+                showResult('otherResult', error.response?.data || error.message, true);
+            }
+        }
+
+        // 8. 刷新缓存
+        async function refreshCache() {
+            try {
+                const res = await api.post('/v1/system/parameters/refresh');
+                showResult('otherResult', res.data);
+            } catch (error) {
+                showResult('otherResult', error.response?.data || error.message, true);
+            }
+        }
+
+        // 9. 导出配置
+        async function exportConfig() {
+            try {
+                const res = await api.get('/v1/system/parameters/export', {
+                    responseType: 'blob'
+                });
+                
+                // 创建下载链接
+                const blob = new Blob([res.data], { type: 'application/json' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `system_params_${Date.now()}.json`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+                
+                showResult('otherResult', { message: '导出成功，请查看下载文件' });
+            } catch (error) {
+                showResult('otherResult', error.response?.data || error.message, true);
+            }
+        }
+
+        // 页面加载时自动登录
+        window.onload = function() {
+            console.log('系统参数接口测试页面已加载');
+            console.log('API基础地址:', API_BASE);
+        };
+    </script>
+</body>
+</html>

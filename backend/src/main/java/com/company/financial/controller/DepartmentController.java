@@ -5,9 +5,11 @@ import com.company.financial.dto.department.*;
 import com.company.financial.dto.position.PositionDTO;
 import com.company.financial.service.DepartmentService;
 import com.company.financial.service.PositionService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -18,10 +20,11 @@ import java.util.List;
  * 
  * @author System
  */
-
+@Slf4j
 @RestController
 @RequestMapping("/v1/departments")
-@Slf4j
+@RequiredArgsConstructor
+@Validated
 public class DepartmentController {
     
     @Autowired
