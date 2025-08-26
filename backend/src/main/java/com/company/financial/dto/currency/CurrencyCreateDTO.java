@@ -26,7 +26,7 @@ public class CurrencyCreateDTO {
     @NotBlank(message = "币种符号不能为空")
     private String symbol;
     
-    private Integer decimalPlaces = 2;
+    private Integer decimalPlaces = 8;
     
     private Integer sortOrder;
 }

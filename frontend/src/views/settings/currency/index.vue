@@ -419,7 +419,7 @@ const handleSave = async () => {
         name: currencyForm.value.name,
         nameEn: currencyForm.value.nameEn || currencyForm.value.name,
         symbol: currencyForm.value.symbol,
-        decimalPlaces: 2,
+        decimalPlaces: 8,
         sortOrder: currencyForm.value.sortOrder || 0
       }
       const res = await currencyApi.updateCurrency(currencyForm.value.id, updateData)
@@ -435,7 +435,7 @@ const handleSave = async () => {
         name: currencyForm.value.name,
         nameEn: currencyForm.value.nameEn || currencyForm.value.name,
         symbol: currencyForm.value.symbol,
-        decimalPlaces: 2,
+        decimalPlaces: 8,
         sortOrder: currencyForm.value.sortOrder || 0
       }
       const res = await currencyApi.createCurrency(createData)

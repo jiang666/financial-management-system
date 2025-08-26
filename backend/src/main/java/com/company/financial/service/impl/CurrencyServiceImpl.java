@@ -116,7 +116,7 @@ public class CurrencyServiceImpl implements CurrencyService {
         currency.setName(createDTO.getName());
         currency.setNameEn(createDTO.getNameEn());
         currency.setSymbol(createDTO.getSymbol());
-        currency.setDecimalPlaces(createDTO.getDecimalPlaces() != null ? createDTO.getDecimalPlaces() : 2);
+        currency.setDecimalPlaces(createDTO.getDecimalPlaces() != null ? createDTO.getDecimalPlaces() : 8);
         currency.setSortOrder(createDTO.getSortOrder());
         currency.setIsBase(0);
         currency.setStatus(1);
