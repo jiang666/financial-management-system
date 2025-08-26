@@ -44,11 +44,11 @@
         <el-table-column prop="symbol" label="符号" width="80" />
         <el-table-column prop="exchangeRate" label="汇率" width="140" align="right">
           <template #default="{ row }">
-            <span v-if="row.isBase" class="base-rate">1.0000</span>
+            <span v-if="row.isBase" class="base-rate">1.00000000</span>
             <el-input-number
               v-else
               v-model="row.exchangeRate"
-              :precision="4"
+              :precision="8"
               :min="0"
               :controls="false"
               @change="handleRateChange(row)"
@@ -100,13 +100,16 @@
         <el-form-item label="币种名称" prop="name">
           <el-input v-model="currencyForm.name" placeholder="请输入币种名称（如：美元）" />
         </el-form-item>
+        <el-form-item label="英文名称">
+          <el-input v-model="currencyForm.nameEn" placeholder="请输入英文名称（如：US Dollar）" />
+        </el-form-item>
         <el-form-item label="币种符号" prop="symbol">
           <el-input v-model="currencyForm.symbol" placeholder="请输入币种符号（如：$）" />
         </el-form-item>
         <el-form-item label="汇率" prop="exchangeRate" v-if="!currencyForm.isBase">
           <el-input-number
             v-model="currencyForm.exchangeRate"
-            :precision="4"
+            :precision="8"
             :min="0"
             placeholder="请输入汇率"
             style="width: 100%"
@@ -159,7 +162,7 @@
         <el-table-column prop="currency" label="币种" width="100" />
         <el-table-column prop="rate" label="汇率" width="120" align="right">
           <template #default="{ row }">
-            {{ row.rate.toFixed(4) }}
+            {{ row.rate.toFixed(8) }}
           </template>
         </el-table-column>
         <el-table-column prop="changeAmount" label="变动幅度" width="120" align="right">
@@ -186,7 +189,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { mockCurrencies } from '@/api/mockData'
+import { currencyApi, exchangeRateApi } from '@/api/currency'
 
 const loading = ref(false)
 const historyLoading = ref(false)
@@ -206,6 +209,7 @@ const currencyForm = ref({
   id: '',
   code: '',
   name: '',
+  nameEn: '',
   symbol: '',
   exchangeRate: 1,
   isBase: false,
@@ -242,15 +246,26 @@ onMounted(() => {
   loadData()
 })
 
-const loadData = () => {
+const loadData = async () => {
   loading.value = true
-  setTimeout(() => {
-    tableData.value = mockCurrencies.map(item => ({
-      ...item,
-      updateTime: '2025-08-15 09:00:00'
-    }))
+  try {
+    // 获取所有币种列表
+    const res = await currencyApi.getAllCurrencies()
+    if (res.code === 200) {
+      tableData.value = res.data.map(item => ({
+        ...item,
+        exchangeRate: item.currentRate || 1,
+        status: item.status === 1 ? '启用' : '停用',
+        isBase: item.isBase === 1,
+        updateTime: item.lastRateUpdate ? new Date(item.lastRateUpdate).toLocaleString() : '-'
+      }))
+    }
+  } catch (error) {
+    console.error('获取币种列表失败:', error)
+    ElMessage.error('获取币种列表失败')
+  } finally {
     loading.value = false
-  }, 500)
+  }
 }
 
 const handleSearch = () => {
@@ -272,6 +287,7 @@ const handleAdd = () => {
     id: '',
     code: '',
     name: '',
+    nameEn: '',
     symbol: '',
     exchangeRate: 1,
     isBase: false,
@@ -296,10 +312,17 @@ const handleDelete = async (row) => {
         type: 'warning'
       }
     )
-    ElMessage.success('删除成功')
-    loadData()
-  } catch {
-    // 取消删除
+    
+    const res = await currencyApi.deleteCurrency(row.id)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      loadData()
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除失败:', error)
+      ElMessage.error(error.response?.data?.message || '删除失败')
+    }
   }
 }
 
@@ -308,54 +331,118 @@ const handleRateChange = (row) => {
   ElMessage.success(`${row.name}汇率已更新`)
 }
 
-const handleBaseChange = (row) => {
+const handleBaseChange = async (row) => {
   if (row.isBase) {
-    // 取消其他币种的基准状态
-    tableData.value.forEach(item => {
-      if (item.id !== row.id) {
-        item.isBase = false
+    try {
+      const res = await currencyApi.setBaseCurrency(row.id)
+      if (res.code === 200) {
+        ElMessage.success(`${row.name}已设为基准币种`)
+        loadData()
       }
-    })
-    row.exchangeRate = 1
-    ElMessage.success(`${row.name}已设为基准币种`)
+    } catch (error) {
+      console.error('设置基准币种失败:', error)
+      ElMessage.error('设置基准币种失败')
+      row.isBase = false
+    }
   }
 }
 
-const handleStatusChange = (row) => {
-  ElMessage.success(`币种"${row.name}"状态已更新`)
+const handleStatusChange = async (row) => {
+  try {
+    const status = row.status === '启用' ? 1 : 0
+    const res = await currencyApi.toggleCurrencyStatus(row.id, status)
+    if (res.code === 200) {
+      ElMessage.success(`币种"${row.name}"状态已更新`)
+    }
+  } catch (error) {
+    console.error('更新状态失败:', error)
+    ElMessage.error('更新状态失败')
+    // 恢复原状态
+    row.status = row.status === '启用' ? '停用' : '启用'
+  }
 }
 
 const handleSave = async () => {
   const valid = await currencyFormRef.value.validate().catch(() => false)
   if (!valid) return
   
-  if (currencyForm.value.isBase) {
-    currencyForm.value.exchangeRate = 1
+  try {
+    if (currencyForm.value.id) {
+      // 编辑币种
+      const updateData = {
+        name: currencyForm.value.name,
+        nameEn: currencyForm.value.nameEn || currencyForm.value.name,
+        symbol: currencyForm.value.symbol,
+        decimalPlaces: 2,
+        sortOrder: currencyForm.value.sortOrder || 0
+      }
+      const res = await currencyApi.updateCurrency(currencyForm.value.id, updateData)
+      if (res.code === 200) {
+        ElMessage.success('编辑成功')
+        currencyDialog.value = false
+        loadData()
+      }
+    } else {
+      // 新增币种
+      const createData = {
+        code: currencyForm.value.code,
+        name: currencyForm.value.name,
+        nameEn: currencyForm.value.nameEn || currencyForm.value.name,
+        symbol: currencyForm.value.symbol,
+        decimalPlaces: 2,
+        sortOrder: currencyForm.value.sortOrder || 0
+      }
+      const res = await currencyApi.createCurrency(createData)
+      if (res.code === 200) {
+        ElMessage.success('新增成功')
+        
+        // 如果设置为基准币种
+        if (currencyForm.value.isBase) {
+          await currencyApi.setBaseCurrency(res.data.id)
+        }
+        
+        // 如果不是基准币种且设置了汇率，更新汇率
+        if (!currencyForm.value.isBase && currencyForm.value.exchangeRate !== 1) {
+          const baseCurrency = await currencyApi.getBaseCurrency()
+          if (baseCurrency.code === 200 && baseCurrency.data) {
+            await exchangeRateApi.updateRate(baseCurrency.data.id, res.data.id, {
+              rate: currencyForm.value.exchangeRate
+            })
+          }
+        }
+        
+        currencyDialog.value = false
+        loadData()
+      }
+    }
+  } catch (error) {
+    console.error('保存失败:', error)
+    ElMessage.error(error.response?.data?.message || '保存失败')
   }
-  
-  currencyDialog.value = false
-  ElMessage.success(currencyForm.value.id ? '编辑成功' : '新增成功')
-  loadData()
 }
 
 const resetForm = () => {
   currencyFormRef.value?.resetFields()
 }
 
-const handleUpdateRates = () => {
+const handleUpdateRates = async () => {
   loading.value = true
-  setTimeout(() => {
-    // 模拟从外部API获取汇率
-    tableData.value.forEach(item => {
-      if (!item.isBase) {
-        const randomChange = (Math.random() - 0.5) * 0.1
-        item.exchangeRate = Math.max(0.0001, item.exchangeRate + randomChange)
-        item.updateTime = new Date().toLocaleString()
+  try {
+    const res = await exchangeRateApi.syncRatesFromExternalAPI()
+    if (res.code === 200) {
+      if (res.data.errorMessage) {
+        ElMessage.warning(res.data.errorMessage)
+      } else {
+        ElMessage.success(`汇率更新成功，成功${res.data.successCount}条，失败${res.data.failCount}条`)
       }
-    })
+      loadData()
+    }
+  } catch (error) {
+    console.error('更新汇率失败:', error)
+    ElMessage.error('更新汇率失败')
+  } finally {
     loading.value = false
-    ElMessage.success('汇率更新成功')
-  }, 1000)
+  }
 }
 
 const handleViewHistory = (row) => {
@@ -364,10 +451,41 @@ const handleViewHistory = (row) => {
   loadRateHistory()
 }
 
-const loadRateHistory = () => {
+const loadRateHistory = async () => {
   historyLoading.value = true
-  setTimeout(() => {
-    // 模拟汇率历史数据
+  try {
+    const params = {
+      currencyCode: historySearch.value.currency,
+      page: 0,
+      size: 20
+    }
+    
+    if (historySearch.value.dateRange && historySearch.value.dateRange.length === 2) {
+      params.startDate = new Date(historySearch.value.dateRange[0]).getTime()
+      params.endDate = new Date(historySearch.value.dateRange[1]).getTime()
+    }
+    
+    const res = await exchangeRateApi.getRateHistory(params)
+    if (res.code === 200) {
+      // 转换数据格式
+      rateHistoryData.value = res.data.content.map((item, index, arr) => {
+        const previousRate = index < arr.length - 1 ? arr[index + 1].rate : item.rate
+        const changeAmount = item.rate - previousRate
+        const changePercent = previousRate !== 0 ? changeAmount / previousRate : 0
+        
+        return {
+          currency: item.fromCurrencyCode || item.toCurrencyCode,
+          rate: item.rate,
+          changeAmount: changeAmount,
+          changePercent: changePercent,
+          updateTime: new Date(item.effectiveDate).toLocaleString(),
+          operator: item.createdBy
+        }
+      })
+    }
+  } catch (error) {
+    console.error('获取汇率历史失败:', error)
+    // 如果接口失败，显示模拟数据
     rateHistoryData.value = [
       {
         currency: historySearch.value.currency || 'USD',
@@ -384,18 +502,11 @@ const loadRateHistory = () => {
         changePercent: -0.0012,
         updateTime: '2025-08-14 09:00:00',
         operator: '系统自动'
-      },
-      {
-        currency: historySearch.value.currency || 'USD',
-        rate: 7.2331,
-        changeAmount: 0.0156,
-        changePercent: 0.0022,
-        updateTime: '2025-08-13 09:00:00',
-        operator: '张三'
       }
     ]
+  } finally {
     historyLoading.value = false
-  }, 500)
+  }
 }
 </script>
 
