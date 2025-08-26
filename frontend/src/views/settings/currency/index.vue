@@ -367,10 +367,11 @@ const validateTableRate = (row) => {
     return
   }
   
-  // 限制小数位数为8位
+  // 限制小数位数为8位，但保持字符串精度
   const parts = row.exchangeRate.toString().split('.')
   if (parts[1] && parts[1].length > 8) {
-    row.exchangeRate = rateValue.toFixed(8)
+    // 直接截取字符串，不使用parseFloat避免精度丢失
+    row.exchangeRate = parts[0] + '.' + parts[1].substring(0, 8)
   }
   
   console.log('表格汇率验证后:', row.exchangeRate)
@@ -491,10 +492,11 @@ const validateExchangeRate = () => {
     return
   }
   
-  // 限制小数位数为8位
+  // 限制小数位数为8位，但保持字符串精度
   const parts = currencyForm.value.exchangeRate.toString().split('.')
   if (parts[1] && parts[1].length > 8) {
-    currencyForm.value.exchangeRate = rateValue.toFixed(8)
+    // 直接截取字符串，不使用parseFloat避免精度丢失
+    currencyForm.value.exchangeRate = parts[0] + '.' + parts[1].substring(0, 8)
   }
   
   console.log('汇率验证后:', currencyForm.value.exchangeRate)

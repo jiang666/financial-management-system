@@ -31,9 +31,11 @@ public class JacksonConfig {
         // 配置Java 8时间模块
         objectMapper.registerModule(new JavaTimeModule());
         
-        // 配置BigDecimal序列化，保持精度
+        // 配置BigDecimal序列化和反序列化，保持精度
         SimpleModule simpleModule = new SimpleModule();
         simpleModule.addSerializer(BigDecimal.class, ToStringSerializer.instance);
+        // 添加BigDecimal反序列化器，确保从字符串正确解析
+        simpleModule.addDeserializer(BigDecimal.class, new com.fasterxml.jackson.databind.deser.std.BigDecimalDeserializer());
         objectMapper.registerModule(simpleModule);
         
         // 禁用将日期写为时间戳
@@ -41,6 +43,9 @@ public class JacksonConfig {
         
         // 禁用科学计数法
         objectMapper.enable(com.fasterxml.jackson.core.JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN);
+        
+        // 配置反序列化时保持BigDecimal精度
+        objectMapper.enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
         
         // 设置时间格式
         objectMapper.setDateFormat(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss"));

@@ -20,6 +20,19 @@ service.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
     }
+    
+    // 调试汇率相关请求
+    if (config.url && config.url.includes('exchange-rates')) {
+      console.log('汇率API请求:', config.url)
+      console.log('请求方法:', config.method)
+      console.log('请求数据:', config.data)
+      if (config.data && config.data.rate) {
+        console.log('汇率值类型:', typeof config.data.rate)
+        console.log('汇率值:', config.data.rate)
+        console.log('JSON序列化后:', JSON.stringify(config.data))
+      }
+    }
+    
     return config
   },
   error => {

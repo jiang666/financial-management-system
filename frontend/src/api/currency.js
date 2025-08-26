@@ -132,6 +132,8 @@ export const exchangeRateApi = {
 
   // 手动更新汇率
   updateRate(fromCurrencyId, toCurrencyId, data) {
+    console.log('API调用updateRate:', { fromCurrencyId, toCurrencyId, data })
+    console.log('rate数据类型:', typeof data.rate, 'rate值:', data.rate)
     return request({
       url: `/v1/exchange-rates/${fromCurrencyId}/${toCurrencyId}`,
       method: 'put',
