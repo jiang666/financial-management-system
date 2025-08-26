@@ -47,6 +47,8 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
     // @Cacheable(value = "exchange_rates", key = "#fromCurrencyId + '_' + #toCurrencyId")
     public BigDecimal getLatestRate(String fromCurrencyId, String toCurrencyId) {
         Long currentTime = System.currentTimeMillis();
+        log.info("查询汇率: fromCurrencyId={}, toCurrencyId={}, currentTime={}", 
+            fromCurrencyId, toCurrencyId, currentTime);
         Optional<ExchangeRate> rateOpt = exchangeRateRepository.findLatestRate(
             fromCurrencyId, toCurrencyId, currentTime);
         
