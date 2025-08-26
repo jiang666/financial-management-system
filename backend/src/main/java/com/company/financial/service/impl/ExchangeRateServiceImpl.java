@@ -105,14 +105,21 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
             
             // 如果提供了currencyCode，需要先转换为currencyId
             String currencyIdForQuery = queryDTO.getCurrencyId();
+            log.info("原始查询参数: currencyId={}, currencyCode={}", queryDTO.getCurrencyId(), queryDTO.getCurrencyCode());
             if (currencyIdForQuery == null && queryDTO.getCurrencyCode() != null) {
                 Currency currency = currencyRepository.findByCode(queryDTO.getCurrencyCode()).orElse(null);
                 if (currency != null) {
                     currencyIdForQuery = currency.getId();
+                    log.info("通过币种代码 {} 找到币种ID: {}", queryDTO.getCurrencyCode(), currencyIdForQuery);
+                } else {
+                    log.warn("未找到币种代码: {}", queryDTO.getCurrencyCode());
                 }
             }
             
             Pageable pageable = PageRequest.of(queryDTO.getPage(), queryDTO.getSize(), sort);
+            log.info("执行汇率历史查询: currencyId={}, startDate={}, endDate={}, source={}", 
+                currencyIdForQuery, queryDTO.getStartDate(), queryDTO.getEndDate(), queryDTO.getSource());
+            
             Page<ExchangeRate> ratePage = exchangeRateRepository.findRateHistory(
                 currencyIdForQuery,
                 queryDTO.getStartDate(),
@@ -120,6 +127,8 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
                 queryDTO.getSource(),
                 pageable
             );
+            
+            log.info("查询到汇率历史记录数量: {}", ratePage.getContent().size());
             
             List<ExchangeRateHistoryDTO> rateDTOs = ratePage.getContent().stream()
                 .map(this::convertToHistoryDTO)
