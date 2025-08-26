@@ -199,23 +199,33 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
             // 获取基准币种
             Currency baseCurrency = currencyRepository.findBaseCurrency()
                 .orElseThrow(() -> new IllegalArgumentException("未设置基准币种"));
+            log.info("获取到基准币种: {}", baseCurrency.getCode());
             
             // 获取所有活跃币种
             List<Currency> activeCurrencies = currencyRepository.findAllActiveCurrencies();
+            log.info("获取到活跃币种数量: {}, 币种列表: {}", 
+                activeCurrencies.size(),
+                activeCurrencies.stream().map(Currency::getCode).toArray());
             
             // 调用外部API获取汇率
+            log.info("正在调用外部API获取汇率...");
             Map<String, BigDecimal> rates = externalRateService.getRatesByBaseCurrency(baseCurrency.getCode());
+            log.info("外部API返回汇率数量: {}, 汇率数据: {}", 
+                rates != null ? rates.size() : 0, rates);
                 
             int successCount = 0;
             int failCount = 0;
             
             for (Currency currency : activeCurrencies) {
+                log.info("处理币种: {}, isBase: {}", currency.getCode(), currency.getIsBase());
                 if (currency.getIsBase() == 1) {
+                    log.info("跳过基准币种: {}", currency.getCode());
                     continue; // 跳过基准币种
                 }
                 
                 try {
                     BigDecimal rate = rates.get(currency.getCode());
+                    log.info("币种 {} 对应汇率: {}", currency.getCode(), rate);
                     if (rate != null) {
                             // 创建汇率记录
                             ExchangeRate exchangeRate = new ExchangeRate();
@@ -237,11 +247,14 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
                             exchangeRate.setUpdatedBy(currentUser);
                             
                             exchangeRateRepository.save(exchangeRate);
+                            log.info("成功保存汇率: {} -> {}, rate: {}", baseCurrency.getCode(), currency.getCode(), rate);
                             successCount++;
                         } else {
+                            log.warn("币种 {} 未获取到汇率", currency.getCode());
                             failCount++;
                         }
                     } catch (Exception e) {
+                        log.error("处理币种 {} 时发生异常: {}", currency.getCode(), e.getMessage(), e);
                         failCount++;
                     }
             }

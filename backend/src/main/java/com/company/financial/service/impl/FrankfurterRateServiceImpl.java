@@ -32,19 +32,23 @@ public class FrankfurterRateServiceImpl implements ExternalRateService {
         "MXN", "SGD", "HKD", "NOK", "KRW", "TRY", "RUB", "INR", "BRL", "ZAR"
     };
     
-    public FrankfurterRateServiceImpl() {
-        this.restTemplate = new RestTemplate();
+    public FrankfurterRateServiceImpl(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
     }
     
     @Override
     public Map<String, BigDecimal> getRatesByBaseCurrency(String baseCurrencyCode) {
         try {
             String url = API_BASE_URL + LATEST_ENDPOINT + "?base=" + baseCurrencyCode;
+            log.info("调用Frankfurter API: {}", url);
             
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+            log.info("Frankfurter API响应: {}", response);
             
             if (response != null && response.containsKey("rates")) {
-                return (Map<String, BigDecimal>) response.get("rates");
+                Map<String, BigDecimal> rates = (Map<String, BigDecimal>) response.get("rates");
+                log.info("解析到汇率数量: {}", rates.size());
+                return rates;
             } else {
                 log.error("Invalid response from Frankfurter API: {}", response);
                 throw new RuntimeException("外部API返回数据格式错误");
@@ -53,6 +57,9 @@ public class FrankfurterRateServiceImpl implements ExternalRateService {
         } catch (RestClientException e) {
             log.error("Failed to fetch rates from Frankfurter API for base currency: {}", baseCurrencyCode, e);
             throw new RuntimeException("调用外部汇率API失败: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("Unexpected error when calling Frankfurter API: {}", e.getMessage(), e);
+            throw new RuntimeException("调用外部汇率API时发生未知错误: " + e.getMessage());
         }
     }
     
