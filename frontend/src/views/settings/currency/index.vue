@@ -161,20 +161,20 @@
         <el-table-column prop="currency" label="币种" width="100" />
         <el-table-column prop="rate" label="汇率" width="120" align="right">
           <template #default="{ row }">
-            {{ row.rate.toFixed(8) }}
+            {{ typeof row.rate === 'number' ? row.rate.toFixed(8) : parseFloat(row.rate || 0).toFixed(8) }}
           </template>
         </el-table-column>
         <el-table-column prop="changeAmount" label="变动幅度" width="120" align="right">
           <template #default="{ row }">
             <span :class="row.changeAmount >= 0 ? 'text-success' : 'text-danger'">
-              {{ row.changeAmount >= 0 ? '+' : '' }}{{ row.changeAmount.toFixed(4) }}
+              {{ row.changeAmount >= 0 ? '+' : '' }}{{ (row.changeAmount || 0).toFixed(4) }}
             </span>
           </template>
         </el-table-column>
         <el-table-column prop="changePercent" label="变动比例" width="120" align="right">
           <template #default="{ row }">
             <span :class="row.changePercent >= 0 ? 'text-success' : 'text-danger'">
-              {{ row.changePercent >= 0 ? '+' : '' }}{{ (row.changePercent * 100).toFixed(2) }}%
+              {{ row.changePercent >= 0 ? '+' : '' }}{{ ((row.changePercent || 0) * 100).toFixed(2) }}%
             </span>
           </template>
         </el-table-column>
@@ -543,14 +543,20 @@ const loadRateHistory = async () => {
     }
     
     const res = await exchangeRateApi.getRateHistory(params)
+    console.log('汇率历史API响应:', res)
     if (res.code === 200) {
+      console.log('响应数据:', res.data)
+      console.log('content数组:', res.data.content)
+      console.log('content数组长度:', res.data.content.length)
+      
       // 转换数据格式
       rateHistoryData.value = res.data.content.map((item, index, arr) => {
+        console.log('处理汇率记录:', item)
         const previousRate = index < arr.length - 1 ? arr[index + 1].rate : item.rate
         const changeAmount = item.rate - previousRate
         const changePercent = previousRate !== 0 ? changeAmount / previousRate : 0
         
-        return {
+        const transformedItem = {
           currency: item.fromCurrencyCode || item.toCurrencyCode,
           rate: item.rate,
           changeAmount: changeAmount,
@@ -558,7 +564,10 @@ const loadRateHistory = async () => {
           updateTime: new Date(item.effectiveDate).toLocaleString(),
           operator: item.createdBy
         }
+        console.log('转换后的数据:', transformedItem)
+        return transformedItem
       })
+      console.log('最终的rateHistoryData:', rateHistoryData.value)
     }
   } catch (error) {
     console.error('获取汇率历史失败:', error)
