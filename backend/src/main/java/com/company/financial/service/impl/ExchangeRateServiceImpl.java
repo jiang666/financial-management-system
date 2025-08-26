@@ -92,7 +92,12 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
                 if (sortParts.length == 2) {
                     Sort.Direction direction = "asc".equalsIgnoreCase(sortParts[1]) ? 
                         Sort.Direction.ASC : Sort.Direction.DESC;
-                    sort = Sort.by(direction, sortParts[0]);
+                    // 将 snake_case 转换为 camelCase
+                    String fieldName = sortParts[0];
+                    if ("effective_date".equals(fieldName)) {
+                        fieldName = "effectiveDate";
+                    }
+                    sort = Sort.by(direction, fieldName);
                 }
             }
             
