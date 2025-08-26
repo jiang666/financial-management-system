@@ -4,6 +4,7 @@ import com.company.financial.entity.ExchangeRate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -74,6 +75,7 @@ public interface ExchangeRateRepository extends JpaRepository<ExchangeRate, Stri
     /**
      * 删除指定币种的所有汇率记录
      */
+    @Modifying
     @Query("UPDATE ExchangeRate er SET er.deleted = 1, er.updatedAt = :updateTime, er.updatedBy = :updatedBy " +
            "WHERE er.deleted = 0 AND (er.fromCurrencyId = :currencyId OR er.toCurrencyId = :currencyId)")
     void logicalDeleteByCurrencyId(@Param("currencyId") String currencyId,
