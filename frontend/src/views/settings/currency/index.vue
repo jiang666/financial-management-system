@@ -42,17 +42,16 @@
         </el-table-column>
         <el-table-column prop="name" label="币种名称" min-width="120" />
         <el-table-column prop="symbol" label="符号" width="80" />
-        <el-table-column prop="exchangeRate" label="汇率" width="140" align="right">
+        <el-table-column prop="exchangeRate" label="汇率" width="160" align="right">
           <template #default="{ row }">
             <span v-if="row.isBase" class="base-rate">1.00000000</span>
-            <el-input-number
+            <el-input
               v-else
               v-model="row.exchangeRate"
-              :precision="8"
-              :min="0"
-              :controls="false"
               @change="handleRateChange(row)"
-              style="width: 100%"
+              @blur="validateTableRate(row)"
+              style="width: 100%; text-align: right"
+              placeholder="请输入汇率"
             />
           </template>
         </el-table-column>
@@ -272,7 +271,7 @@ const loadData = async () => {
     if (res.code === 200) {
       tableData.value = res.data.map(item => ({
         ...item,
-        exchangeRate: item.currentRate || 1,
+        exchangeRate: item.currentRate ? item.currentRate.toString() : '1.00000000',
         status: item.status === 1 ? '启用' : '停用',
         isBase: item.isBase === 1,
         updateTime: item.lastRateUpdate ? new Date(item.lastRateUpdate).toLocaleString() : '-'
@@ -315,7 +314,10 @@ const handleAdd = () => {
 }
 
 const handleEdit = (row) => {
-  currencyForm.value = { ...row }
+  currencyForm.value = { 
+    ...row,
+    exchangeRate: row.exchangeRate ? row.exchangeRate.toString() : '1.00000000'
+  }
   currencyDialog.value = true
 }
 
@@ -345,8 +347,33 @@ const handleDelete = async (row) => {
 }
 
 const handleRateChange = (row) => {
+  console.log('表格汇率变更:', row.exchangeRate)
   row.updateTime = new Date().toLocaleString()
   ElMessage.success(`${row.name}汇率已更新`)
+}
+
+const validateTableRate = (row) => {
+  console.log('表格汇率验证:', row.exchangeRate)
+  
+  if (!row.exchangeRate) {
+    row.exchangeRate = '1.00000000'
+    return
+  }
+  
+  const rateValue = parseFloat(row.exchangeRate)
+  if (isNaN(rateValue) || rateValue <= 0) {
+    ElMessage.warning('请输入有效的汇率值')
+    row.exchangeRate = '1.00000000'
+    return
+  }
+  
+  // 限制小数位数为8位
+  const parts = row.exchangeRate.toString().split('.')
+  if (parts[1] && parts[1].length > 8) {
+    row.exchangeRate = rateValue.toFixed(8)
+  }
+  
+  console.log('表格汇率验证后:', row.exchangeRate)
 }
 
 const handleBaseChange = async (row) => {

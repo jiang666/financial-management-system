@@ -30,7 +30,7 @@ public class ExchangeRate {
     @Column(name = "to_currency_id")
     private String toCurrencyId;
     
-    @Column(name = "rate")
+    @Column(name = "rate", precision = 20, scale = 8)
     private BigDecimal rate;
     
     @Column(name = "rate_type")
