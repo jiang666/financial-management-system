@@ -44,17 +44,15 @@ public interface ExchangeRateRepository extends JpaRepository<ExchangeRate, Stri
     List<ExchangeRate> findByCurrencyId(@Param("currencyId") String currencyId);
     
     /**
-     * 条件查询汇率历史
+     * 条件查询汇率历史 - 暂时移除currencyCode的查询条件
      */
     @Query("SELECT er FROM ExchangeRate er " +
            "WHERE er.deleted = 0 " +
            "AND (:currencyId IS NULL OR er.fromCurrencyId = :currencyId OR er.toCurrencyId = :currencyId) " +
-           "AND (:currencyCode IS NULL OR EXISTS (SELECT 1 FROM Currency c WHERE (c.id = er.fromCurrencyId OR c.id = er.toCurrencyId) AND c.code = :currencyCode)) " +
            "AND (:startDate IS NULL OR er.effectiveDate >= :startDate) " +
            "AND (:endDate IS NULL OR er.effectiveDate <= :endDate) " +
            "AND (:source IS NULL OR er.source = :source)")
     Page<ExchangeRate> findRateHistory(@Param("currencyId") String currencyId,
-                                      @Param("currencyCode") String currencyCode,
                                       @Param("startDate") Long startDate,
                                       @Param("endDate") Long endDate,
                                       @Param("source") String source,

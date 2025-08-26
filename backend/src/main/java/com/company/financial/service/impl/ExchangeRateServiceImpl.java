@@ -82,42 +82,58 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
     
     @Override
     public ResponsePageDataEntity<ExchangeRateHistoryDTO> getRateHistory(ExchangeRateQueryDTO queryDTO) {
-        // 构建排序
-        Sort sort = Sort.by(Sort.Direction.DESC, "effectiveDate");
-        if (queryDTO.getSort() != null && !queryDTO.getSort().isEmpty()) {
-            String[] sortParts = queryDTO.getSort().split(",");
-            if (sortParts.length == 2) {
-                Sort.Direction direction = "asc".equalsIgnoreCase(sortParts[1]) ? 
-                    Sort.Direction.ASC : Sort.Direction.DESC;
-                sort = Sort.by(direction, sortParts[0]);
+        try {
+            log.info("查询汇率历史: queryDTO={}", queryDTO);
+            
+            // 构建排序
+            Sort sort = Sort.by(Sort.Direction.DESC, "effectiveDate");
+            if (queryDTO.getSort() != null && !queryDTO.getSort().isEmpty()) {
+                String[] sortParts = queryDTO.getSort().split(",");
+                if (sortParts.length == 2) {
+                    Sort.Direction direction = "asc".equalsIgnoreCase(sortParts[1]) ? 
+                        Sort.Direction.ASC : Sort.Direction.DESC;
+                    sort = Sort.by(direction, sortParts[0]);
+                }
             }
+            
+            // 如果提供了currencyCode，需要先转换为currencyId
+            String currencyIdForQuery = queryDTO.getCurrencyId();
+            if (currencyIdForQuery == null && queryDTO.getCurrencyCode() != null) {
+                Currency currency = currencyRepository.findByCode(queryDTO.getCurrencyCode()).orElse(null);
+                if (currency != null) {
+                    currencyIdForQuery = currency.getId();
+                }
+            }
+            
+            Pageable pageable = PageRequest.of(queryDTO.getPage(), queryDTO.getSize(), sort);
+            Page<ExchangeRate> ratePage = exchangeRateRepository.findRateHistory(
+                currencyIdForQuery,
+                queryDTO.getStartDate(),
+                queryDTO.getEndDate(),
+                queryDTO.getSource(),
+                pageable
+            );
+            
+            List<ExchangeRateHistoryDTO> rateDTOs = ratePage.getContent().stream()
+                .map(this::convertToHistoryDTO)
+                .collect(Collectors.toList());
+            
+            ResponsePageDataEntity<ExchangeRateHistoryDTO> response = new ResponsePageDataEntity<>();
+            response.setContent(rateDTOs);
+            response.setTotalElements(ratePage.getTotalElements());
+            response.setTotalPages(ratePage.getTotalPages());
+            response.setSize(ratePage.getSize());
+            response.setNumber(ratePage.getNumber());
+            response.setNumberOfElements(ratePage.getNumberOfElements());
+            response.setFirst(ratePage.isFirst());
+            response.setLast(ratePage.isLast());
+            
+            log.info("查询汇率历史成功: 返回{}条记录", rateDTOs.size());
+            return response;
+        } catch (Exception e) {
+            log.error("查询汇率历史失败", e);
+            throw new RuntimeException("查询汇率历史失败: " + e.getMessage());
         }
-        
-        Pageable pageable = PageRequest.of(queryDTO.getPage(), queryDTO.getSize(), sort);
-        Page<ExchangeRate> ratePage = exchangeRateRepository.findRateHistory(
-            queryDTO.getCurrencyId(),
-            queryDTO.getCurrencyCode(),
-            queryDTO.getStartDate(),
-            queryDTO.getEndDate(),
-            queryDTO.getSource(),
-            pageable
-        );
-        
-        List<ExchangeRateHistoryDTO> rateDTOs = ratePage.getContent().stream()
-            .map(this::convertToHistoryDTO)
-            .collect(Collectors.toList());
-        
-        ResponsePageDataEntity<ExchangeRateHistoryDTO> response = new ResponsePageDataEntity<>();
-        response.setContent(rateDTOs);
-        response.setTotalElements(ratePage.getTotalElements());
-        response.setTotalPages(ratePage.getTotalPages());
-        response.setSize(ratePage.getSize());
-        response.setNumber(ratePage.getNumber());
-        response.setNumberOfElements(ratePage.getNumberOfElements());
-        response.setFirst(ratePage.isFirst());
-        response.setLast(ratePage.isLast());
-        
-        return response;
     }
     
     @Override
