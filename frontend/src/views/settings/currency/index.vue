@@ -562,25 +562,8 @@ const loadRateHistory = async () => {
     }
   } catch (error) {
     console.error('获取汇率历史失败:', error)
-    // 如果接口失败，显示模拟数据
-    rateHistoryData.value = [
-      {
-        currency: historySearch.value.currency || 'USD',
-        rate: 7.2365,
-        changeAmount: 0.0123,
-        changePercent: 0.0017,
-        updateTime: '2025-08-15 09:00:00',
-        operator: '系统自动'
-      },
-      {
-        currency: historySearch.value.currency || 'USD',
-        rate: 7.2242,
-        changeAmount: -0.0089,
-        changePercent: -0.0012,
-        updateTime: '2025-08-14 09:00:00',
-        operator: '系统自动'
-      }
-    ]
+    ElMessage.error('获取汇率历史失败')
+    rateHistoryData.value = []
   } finally {
     historyLoading.value = false
   }

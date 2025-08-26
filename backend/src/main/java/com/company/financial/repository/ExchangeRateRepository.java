@@ -47,11 +47,9 @@ public interface ExchangeRateRepository extends JpaRepository<ExchangeRate, Stri
      * 条件查询汇率历史
      */
     @Query("SELECT er FROM ExchangeRate er " +
-           "LEFT JOIN Currency fc ON er.fromCurrencyId = fc.id " +
-           "LEFT JOIN Currency tc ON er.toCurrencyId = tc.id " +
            "WHERE er.deleted = 0 " +
            "AND (:currencyId IS NULL OR er.fromCurrencyId = :currencyId OR er.toCurrencyId = :currencyId) " +
-           "AND (:currencyCode IS NULL OR fc.code = :currencyCode OR tc.code = :currencyCode) " +
+           "AND (:currencyCode IS NULL OR EXISTS (SELECT 1 FROM Currency c WHERE (c.id = er.fromCurrencyId OR c.id = er.toCurrencyId) AND c.code = :currencyCode)) " +
            "AND (:startDate IS NULL OR er.effectiveDate >= :startDate) " +
            "AND (:endDate IS NULL OR er.effectiveDate <= :endDate) " +
            "AND (:source IS NULL OR er.source = :source)")
