@@ -7,6 +7,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -46,7 +47,30 @@ public class FrankfurterRateServiceImpl implements ExternalRateService {
             log.info("Frankfurter API响应: {}", response);
             
             if (response != null && response.containsKey("rates")) {
-                Map<String, BigDecimal> rates = (Map<String, BigDecimal>) response.get("rates");
+                Map<String, Object> rawRates = (Map<String, Object>) response.get("rates");
+                Map<String, BigDecimal> rates = new HashMap<>();
+                
+                // 转换所有汇率值为BigDecimal
+                for (Map.Entry<String, Object> entry : rawRates.entrySet()) {
+                    Object rateValue = entry.getValue();
+                    BigDecimal rate;
+                    
+                    if (rateValue instanceof Double) {
+                        rate = BigDecimal.valueOf((Double) rateValue);
+                    } else if (rateValue instanceof Integer) {
+                        rate = BigDecimal.valueOf((Integer) rateValue);
+                    } else if (rateValue instanceof String) {
+                        rate = new BigDecimal((String) rateValue);
+                    } else if (rateValue instanceof BigDecimal) {
+                        rate = (BigDecimal) rateValue;
+                    } else {
+                        log.warn("无法转换汇率值类型: {} for currency: {}", rateValue.getClass(), entry.getKey());
+                        continue;
+                    }
+                    
+                    rates.put(entry.getKey(), rate);
+                }
+                
                 log.info("解析到汇率数量: {}", rates.size());
                 return rates;
             } else {
@@ -73,10 +97,22 @@ public class FrankfurterRateServiceImpl implements ExternalRateService {
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
             
             if (response != null && response.containsKey("rates")) {
-                Map<String, BigDecimal> rates = (Map<String, BigDecimal>) response.get("rates");
-                BigDecimal rate = rates.get(toCurrencyCode);
+                Map<String, Object> rawRates = (Map<String, Object>) response.get("rates");
+                Object rateValue = rawRates.get(toCurrencyCode);
                 
-                if (rate != null) {
+                if (rateValue != null) {
+                    BigDecimal rate;
+                    if (rateValue instanceof Double) {
+                        rate = BigDecimal.valueOf((Double) rateValue);
+                    } else if (rateValue instanceof Integer) {
+                        rate = BigDecimal.valueOf((Integer) rateValue);
+                    } else if (rateValue instanceof String) {
+                        rate = new BigDecimal((String) rateValue);
+                    } else if (rateValue instanceof BigDecimal) {
+                        rate = (BigDecimal) rateValue;
+                    } else {
+                        throw new RuntimeException("无法转换汇率值类型: " + rateValue.getClass());
+                    }
                     return rate;
                 } else {
                     throw new RuntimeException("未获取到指定币种对的汇率");
