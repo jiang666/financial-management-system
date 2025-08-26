@@ -99,6 +99,7 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
                     if ("effective_date".equals(fieldName)) {
                         fieldName = "effectiveDate";
                     }
+                    log.info("排序转换: 原字段名={}, 转换后={}, 方向={}", sortParts[0], fieldName, direction);
                     sort = Sort.by(direction, fieldName);
                 }
             }
@@ -120,6 +121,15 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
             log.info("执行汇率历史查询: currencyId={}, startDate={}, endDate={}, source={}", 
                 currencyIdForQuery, queryDTO.getStartDate(), queryDTO.getEndDate(), queryDTO.getSource());
             
+            // 先尝试简单查询，看看是否有任何相关的汇率记录
+            List<ExchangeRate> allRates = exchangeRateRepository.findByCurrencyId(currencyIdForQuery);
+            log.info("该币种的所有汇率记录数量: {}", allRates.size());
+            if (!allRates.isEmpty()) {
+                log.info("第一条记录示例: fromCurrencyId={}, toCurrencyId={}, rate={}, effectiveDate={}, deleted={}", 
+                    allRates.get(0).getFromCurrencyId(), allRates.get(0).getToCurrencyId(), 
+                    allRates.get(0).getRate(), allRates.get(0).getEffectiveDate(), allRates.get(0).getDeleted());
+            }
+            
             Page<ExchangeRate> ratePage = exchangeRateRepository.findRateHistory(
                 currencyIdForQuery,
                 queryDTO.getStartDate(),
@@ -128,7 +138,7 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
                 pageable
             );
             
-            log.info("查询到汇率历史记录数量: {}", ratePage.getContent().size());
+            log.info("分页查询到汇率历史记录数量: {}", ratePage.getContent().size());
             
             List<ExchangeRateHistoryDTO> rateDTOs = ratePage.getContent().stream()
                 .map(this::convertToHistoryDTO)
