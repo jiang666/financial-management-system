@@ -52,7 +52,7 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
         
         if (rateOpt.isPresent()) {
             BigDecimal rate = rateOpt.get().getRate();
-            log.debug("获取汇率: fromCurrencyId={}, toCurrencyId={}, rate={}", 
+            log.info("获取汇率: fromCurrencyId={}, toCurrencyId={}, rate={}", 
                 fromCurrencyId, toCurrencyId, rate.toPlainString());
             return rate;
         }
@@ -64,7 +64,7 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
         if (reverseRateOpt.isPresent()) {
             BigDecimal reverseRate = reverseRateOpt.get().getRate();
             BigDecimal rate = BigDecimal.ONE.divide(reverseRate, 8, RoundingMode.HALF_UP);
-            log.debug("获取反向汇率: fromCurrencyId={}, toCurrencyId={}, reverseRate={}, rate={}", 
+            log.info("获取反向汇率: fromCurrencyId={}, toCurrencyId={}, reverseRate={}, rate={}", 
                 fromCurrencyId, toCurrencyId, reverseRate.toPlainString(), rate.toPlainString());
             return rate;
         }
@@ -246,8 +246,9 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
                             exchangeRate.setCreatedBy(currentUser);
                             exchangeRate.setUpdatedBy(currentUser);
                             
-                            exchangeRateRepository.save(exchangeRate);
-                            log.info("成功保存汇率: {} -> {}, rate: {}", baseCurrency.getCode(), currency.getCode(), rate);
+                            ExchangeRate savedRate = exchangeRateRepository.save(exchangeRate);
+                            log.info("成功保存汇率: {} -> {}, rate: {}, exchangeRateId: {}", 
+                                baseCurrency.getCode(), currency.getCode(), rate.toPlainString(), savedRate.getId());
                             successCount++;
                         } else {
                             log.warn("币种 {} 未获取到汇率", currency.getCode());

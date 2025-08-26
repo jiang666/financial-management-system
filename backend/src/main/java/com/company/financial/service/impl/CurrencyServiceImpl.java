@@ -252,8 +252,10 @@ public class CurrencyServiceImpl implements CurrencyService {
                     BigDecimal currentRate = exchangeRateService.getLatestRate(baseCurrency.getId(), currency.getId());
                     dto.setCurrentRate(currentRate);
                     dto.setLastRateUpdate(System.currentTimeMillis());
+                    log.info("币种 {} 当前汇率: {}", currency.getCode(), currentRate.toPlainString());
                 } catch (Exception e) {
-                    // 忽略汇率获取异常
+                    // 记录汇率获取异常
+                    log.warn("获取币种 {} 汇率失败: {}", currency.getCode(), e.getMessage());
                     dto.setCurrentRate(null);
                     dto.setLastRateUpdate(null);
                 }
