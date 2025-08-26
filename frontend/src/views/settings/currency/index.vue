@@ -556,8 +556,16 @@ const loadRateHistory = async () => {
         const changeAmount = item.rate - previousRate
         const changePercent = previousRate !== 0 ? changeAmount / previousRate : 0
         
+        // 确定要显示的币种：如果查询的是特定币种，显示对方币种；否则显示目标币种
+        let displayCurrency = item.toCurrencyCode
+        if (historySearch.value.currency) {
+          // 如果当前查询的币种是fromCurrencyCode，显示toCurrencyCode；反之显示fromCurrencyCode
+          displayCurrency = historySearch.value.currency === item.fromCurrencyCode ? 
+            item.toCurrencyCode : item.fromCurrencyCode
+        }
+        
         const transformedItem = {
-          currency: item.fromCurrencyCode || item.toCurrencyCode,
+          currency: displayCurrency,
           rate: item.rate,
           changeAmount: changeAmount,
           changePercent: changePercent,
