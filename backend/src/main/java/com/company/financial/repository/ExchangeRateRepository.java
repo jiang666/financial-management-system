@@ -24,7 +24,7 @@ public interface ExchangeRateRepository extends JpaRepository<ExchangeRate, Stri
     /**
      * 获取最新的汇率记录
      */
-    @Query(value = "SELECT er.* FROM exchange_rate er WHERE er.deleted = 0 " +
+    @Query(value = "SELECT er.* FROM exchange_rates er WHERE er.deleted = 0 " +
            "AND er.from_currency_id = :fromCurrencyId " +
            "AND er.to_currency_id = :toCurrencyId " +
            "AND er.status = 1 " +
