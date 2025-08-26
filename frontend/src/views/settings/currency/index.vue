@@ -107,13 +107,13 @@
           <el-input v-model="currencyForm.symbol" placeholder="请输入币种符号（如：$）" />
         </el-form-item>
         <el-form-item label="汇率" prop="exchangeRate" v-if="!currencyForm.isBase">
-          <el-input-number
+          <el-input
             v-model="currencyForm.exchangeRate"
-            :precision="8"
-            :min="0"
-            placeholder="请输入汇率"
-            style="width: 100%"
-          />
+            placeholder="请输入汇率（支持8位小数）"
+            @blur="validateExchangeRate"
+          >
+            <template #append>汇率</template>
+          </el-input>
         </el-form-item>
         <el-form-item label="基准币种">
           <el-switch v-model="currencyForm.isBase" />
@@ -211,7 +211,7 @@ const currencyForm = ref({
   name: '',
   nameEn: '',
   symbol: '',
-  exchangeRate: 1,
+  exchangeRate: '1.00000000',
   isBase: false,
   remark: ''
 })
@@ -234,7 +234,25 @@ const currencyRules = {
   ],
   exchangeRate: [
     { required: true, message: '请输入汇率', trigger: 'blur' },
-    { type: 'number', min: 0, message: '汇率必须大于0', trigger: 'blur' }
+    { 
+      validator: (rule, value, callback) => {
+        if (!value) {
+          callback(new Error('请输入汇率'))
+          return
+        }
+        const rate = parseFloat(value)
+        if (isNaN(rate) || rate <= 0) {
+          callback(new Error('汇率必须为大于0的数字'))
+          return
+        }
+        if (rate > 999999) {
+          callback(new Error('汇率不能超过999999'))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur' 
+    }
   ]
 }
 
@@ -289,7 +307,7 @@ const handleAdd = () => {
     name: '',
     nameEn: '',
     symbol: '',
-    exchangeRate: 1,
+    exchangeRate: '1.00000000',
     isBase: false,
     remark: ''
   }
@@ -402,9 +420,14 @@ const handleSave = async () => {
         }
         
         // 如果不是基准币种且设置了汇率，更新汇率
-        if (!currencyForm.value.isBase && currencyForm.value.exchangeRate !== 1) {
+        if (!currencyForm.value.isBase && currencyForm.value.exchangeRate !== '1' && currencyForm.value.exchangeRate !== '1.00000000') {
           const baseCurrency = await currencyApi.getBaseCurrency()
           if (baseCurrency.code === 200 && baseCurrency.data) {
+            console.log('汇率值类型:', typeof currencyForm.value.exchangeRate)
+            console.log('汇率值:', currencyForm.value.exchangeRate)
+            console.log('汇率值JSON.stringify:', JSON.stringify(currencyForm.value.exchangeRate))
+            
+            // 直接使用字符串形式传递，保持精度
             await exchangeRateApi.updateRate(baseCurrency.data.id, res.data.id, {
               rate: currencyForm.value.exchangeRate
             })
@@ -423,6 +446,31 @@ const handleSave = async () => {
 
 const resetForm = () => {
   currencyFormRef.value?.resetFields()
+}
+
+const validateExchangeRate = () => {
+  console.log('汇率验证:', currencyForm.value.exchangeRate)
+  
+  if (!currencyForm.value.exchangeRate) {
+    currencyForm.value.exchangeRate = '1.00000000'
+    return
+  }
+  
+  // 验证是否为有效数字
+  const rateValue = parseFloat(currencyForm.value.exchangeRate)
+  if (isNaN(rateValue) || rateValue <= 0) {
+    ElMessage.warning('请输入有效的汇率值')
+    currencyForm.value.exchangeRate = '1.00000000'
+    return
+  }
+  
+  // 限制小数位数为8位
+  const parts = currencyForm.value.exchangeRate.toString().split('.')
+  if (parts[1] && parts[1].length > 8) {
+    currencyForm.value.exchangeRate = rateValue.toFixed(8)
+  }
+  
+  console.log('汇率验证后:', currencyForm.value.exchangeRate)
 }
 
 const handleUpdateRates = async () => {

@@ -5,6 +5,7 @@ import com.company.financial.common.ResponsePageDataEntity;
 import com.company.financial.dto.currency.*;
 import com.company.financial.service.ExchangeRateService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +19,7 @@ import java.util.List;
  * @author Claude
  * @date 2025-08-25
  */
+@Slf4j
 @RestController
 @RequestMapping("/v1/exchange-rates")
 @RequiredArgsConstructor
@@ -75,6 +77,8 @@ public class ExchangeRateController {
             @PathVariable String fromCurrencyId,
             @PathVariable String toCurrencyId,
             @Valid @RequestBody RateUpdateDTO updateDTO) {
+        log.info("Controller接收汇率更新请求: fromCurrencyId={}, toCurrencyId={}, rate={}", 
+            fromCurrencyId, toCurrencyId, updateDTO.getRate().toPlainString());
         exchangeRateService.updateRate(fromCurrencyId, toCurrencyId, updateDTO);
         return ResponseEntity.ok(ResponseData.success());
     }
