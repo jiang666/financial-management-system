@@ -49,6 +49,7 @@ public interface ExchangeRateRepository extends JpaRepository<ExchangeRate, Stri
      */
     @Query("SELECT er FROM ExchangeRate er " +
            "WHERE er.deleted = 0 " +
+           "AND er.status = 1 " +
            "AND (:currencyId IS NULL OR er.fromCurrencyId = :currencyId OR er.toCurrencyId = :currencyId) " +
            "AND (:startDate IS NULL OR er.effectiveDate >= :startDate) " +
            "AND (:endDate IS NULL OR er.effectiveDate <= :endDate) " +
