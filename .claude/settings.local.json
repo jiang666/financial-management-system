@@ -30,7 +30,9 @@
       "Bash(powershell:*)",
       "Bash(dir:*)",
       "Bash(git reset:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(wmic process where processid=41980 delete:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }
