@@ -24,13 +24,14 @@ public interface ExchangeRateRepository extends JpaRepository<ExchangeRate, Stri
     /**
      * 获取最新的汇率记录
      */
-    @Query("SELECT er FROM ExchangeRate er WHERE er.deleted = 0 " +
-           "AND er.fromCurrencyId = :fromCurrencyId " +
-           "AND er.toCurrencyId = :toCurrencyId " +
+    @Query(value = "SELECT er.* FROM exchange_rate er WHERE er.deleted = 0 " +
+           "AND er.from_currency_id = :fromCurrencyId " +
+           "AND er.to_currency_id = :toCurrencyId " +
            "AND er.status = 1 " +
-           "AND er.effectiveDate <= :currentTime " +
-           "AND (er.expiryDate IS NULL OR er.expiryDate > :currentTime) " +
-           "ORDER BY er.effectiveDate DESC")
+           "AND er.effective_date <= :currentTime " +
+           "AND (er.expiry_date IS NULL OR er.expiry_date > :currentTime) " +
+           "ORDER BY er.effective_date DESC LIMIT 1", 
+           nativeQuery = true)
     Optional<ExchangeRate> findLatestRate(@Param("fromCurrencyId") String fromCurrencyId,
                                          @Param("toCurrencyId") String toCurrencyId,
                                          @Param("currentTime") Long currentTime);
